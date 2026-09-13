@@ -85,6 +85,7 @@ function createReservation(body) {
       new Array(totalCols).fill('')
     );
     reservations.sheet.appendRow(row);
+    invalidatePublicProductsCache();
 
     return { success: true, message: 'Reserva efetuada com sucesso.' };
   } finally {
@@ -140,6 +141,7 @@ function cancelReservation(body) {
     }
 
     reservations.sheet.getRange(rowIndex + 2, statusColIndex + 1).setValue('cancelled');
+  invalidatePublicProductsCache();
 
     return { success: true };
   } finally {

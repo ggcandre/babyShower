@@ -9,8 +9,14 @@
  * podem ver. Nunca inclui dados administrativos.
  */
 function getPublicProducts() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('public_products');
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
   const products = getAllProductsWithAvailability();
-  return products
+  const publicProducts = products
     .filter(function (p) { return isTruthyActive(p.active); })
     .map(function (p) {
       return {
@@ -27,6 +33,13 @@ function getPublicProducts() {
         active: isTruthyActive(p.active)
       };
     });
+
+  cache.put('public_products', JSON.stringify(publicProducts), 30);
+  return publicProducts;
+}
+
+function invalidatePublicProductsCache() {
+  CacheService.getScriptCache().remove('public_products');
 }
 
 /**
@@ -120,6 +133,7 @@ function addProduct(body) {
     const totalCols = Math.max(site.sheet.getLastColumn(), Object.keys(site.headerIndex).length);
     const row = objectToRow(obj, site.headerIndex, COLUMN_MAP, new Array(totalCols).fill(''));
     site.sheet.appendRow(row);
+    invalidatePublicProductsCache();
 
     return { success: true, product: obj };
   } finally {
@@ -168,6 +182,7 @@ function updateProduct(body) {
 
     // +2: +1 para o cabeçalho, +1 porque getRange é 1-based
     site.sheet.getRange(rowIndex + 2, 1, 1, newRow.length).setValues([newRow]);
+    invalidatePublicProductsCache();
 
     return { success: true };
   } finally {
@@ -207,6 +222,7 @@ function toggleProductActive(body) {
     if (updatedAtColIndex !== undefined) {
       site.sheet.getRange(rowIndex + 2, updatedAtColIndex + 1).setValue(new Date().toISOString());
     }
+    invalidatePublicProductsCache();
 
     return { success: true, active: newActive };
   } finally {
