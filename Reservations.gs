@@ -49,8 +49,8 @@ function createReservation(body) {
 
     // 2. Ler reservas atuais e calcular disponibilidade
     const reservations = readSheetRaw(SHEET_RESERVATIONS);
-    const reservedTotals = sumActiveReservationsByProduct(reservations);
-    const alreadyReserved = reservedTotals[String(productId)] || 0;
+    const reservationSummary = sumActiveReservationsByProduct(reservations);
+    const alreadyReserved = reservationSummary.totals[String(productId)] || 0;
     const available = desiredQuantity - alreadyReserved;
 
     // 3. Validar quantidade solicitada
@@ -141,7 +141,7 @@ function cancelReservation(body) {
     }
 
     reservations.sheet.getRange(rowIndex + 2, statusColIndex + 1).setValue('cancelled');
-  invalidatePublicProductsCache();
+    invalidatePublicProductsCache();
 
     return { success: true };
   } finally {
