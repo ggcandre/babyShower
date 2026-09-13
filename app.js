@@ -114,6 +114,13 @@
       ? '<span class="tag-full">Já reservado</span>'
       : '<button class="btn btn-primary" data-reserve-id="' + escapeAttr(p.id) + '">Reservar</button>';
 
+    const reservedByHtml = (p.reserved_by && p.reserved_by.length)
+      ? '<p class="item-reserved-by"><strong>Reservado por:</strong> ' +
+        p.reserved_by.map(function (person) {
+          return escapeHtml(person.name) + ' (' + Number(person.quantity) + ')';
+        }).join(', ') + '</p>'
+      : '';
+
     const purchaseLink = p.purchase_url
       ? '<a href="' + escapeAttr(p.purchase_url) + '" target="_blank" rel="noopener" style="font-size:0.82rem;">Ver produto</a>'
       : '';
@@ -129,6 +136,7 @@
             '<div class="item-progress-track"><div class="item-progress-fill" style="width:' + pct + '%"></div></div>' +
             '<span>' + reserved + ' de ' + desired + ' reservado' + (desired === 1 ? '' : 's') + '</span>' +
           '</div>' +
+          reservedByHtml +
           purchaseLink +
         '</div>' +
         '<div class="item-actions">' +

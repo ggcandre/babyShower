@@ -27,6 +27,7 @@ function getPublicProducts() {
         price: p.price,
         desired_quantity: p.desiredQuantity,
         reserved_quantity: p.reservedQuantity,
+        reserved_by: p.reservedBy,
         available_quantity: p.availableQuantity,
         image_url: p.imageUrl,
         purchase_url: p.purchaseUrl,
@@ -76,15 +77,17 @@ function getAllProductsWithAvailability() {
   const site = readSheetRaw(SHEET_PRODUCTS);
   const reservations = readSheetRaw(SHEET_RESERVATIONS);
 
-  const reservedByProduct = sumActiveReservationsByProduct(reservations);
+  const reservationSummary = sumActiveReservationsByProduct(reservations);
 
   return site.rows
     .filter(function (row) { return row[site.headerIndex[COLUMN_MAP.id]] !== ''; })
     .map(function (row) {
       const p = rowToObject(row, site.headerIndex, COLUMN_MAP);
       const desired = Number(p.desiredQuantity) || 0;
-      const reserved = reservedByProduct[String(p.id)] || 0;
+      const productId = String(p.id);
+      const reserved = reservationSummary.totals[productId] || 0;
       p.reservedQuantity = reserved;
+      p.reservedBy = reservationSummary.people[productId] || [];
       p.availableQuantity = Math.max(0, desired - reserved);
       return p;
     });
@@ -92,6 +95,7 @@ function getAllProductsWithAvailability() {
 
 function sumActiveReservationsByProduct(reservationsData) {
   const totals = {};
+  const people = {};
   reservationsData.rows.forEach(function (row) {
     const r = rowToObject(row, reservationsData.headerIndex, RESERVATION_COLUMN_MAP);
     const status = String(r.status || '').trim().toLowerCase();
@@ -101,8 +105,22 @@ function sumActiveReservationsByProduct(reservationsData) {
     const productId = String(r.productId);
     const qty = Number(r.quantity) || 0;
     totals[productId] = (totals[productId] || 0) + qty;
+
+    if (!people[productId]) people[productId] = {};
+    const guestName = String(r.guestName || '').trim();
+    if (guestName) {
+      people[productId][guestName] = (people[productId][guestName] || 0) + qty;
+    }
   });
-  return totals;
+
+  const peopleByProduct = {};
+  Object.keys(people).forEach(function (productId) {
+    peopleByProduct[productId] = Object.keys(people[productId]).map(function (name) {
+      return { name: name, quantity: people[productId][name] };
+    });
+  });
+
+  return { totals: totals, people: peopleByProduct };
 }
 
 /**
