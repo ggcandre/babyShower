@@ -47,7 +47,8 @@ const RESERVATIONS_HEADERS = [
   'Quantidade',
   'Mensagem',
   'Criado Em',
-  'Status'
+  'Status',
+  'Request ID'
 ];
 
 // Mapeamento entre os campos lógicos usados pela aplicação e os nomes
@@ -76,7 +77,8 @@ const RESERVATION_COLUMN_MAP = {
   quantity: 'Quantidade',
   message: 'Mensagem',
   createdAt: 'Criado Em',
-  status: 'Status'
+  status: 'Status',
+  requestId: 'Request ID'
 };
 
 // Estados de reserva que contam para o cálculo de "reserved_quantity".
@@ -183,6 +185,8 @@ function setupSheets() {
   if (!resHasHeaders) {
     reservationsSheet.getRange(1, 1, 1, RESERVATIONS_HEADERS.length).setValues([RESERVATIONS_HEADERS]);
     reservationsSheet.setFrozenRows(1);
+  } else if (resFirstRow.indexOf('Request ID') === -1) {
+    reservationsSheet.getRange(1, reservationsSheet.getLastColumn() + 1).setValue('Request ID');
   }
 
   Logger.log('Setup concluído. Folha "Site": %s linha(s). Folha "Reservas": %s linha(s).',

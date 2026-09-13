@@ -13,6 +13,7 @@ function createReservation(body) {
   const guestName = String(body.guest_name || '').trim();
   const quantity = Number(body.quantity);
   const message = String(body.message || '').trim();
+  const requestId = String(body.request_id || '').trim() || Utilities.getUuid();
 
   if (!productId) {
     throw new AppError('product_id em falta.', 400);
@@ -27,6 +28,23 @@ function createReservation(body) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    // Criar a coluna automaticamente em folhas antigas, sem apagar dados.
+    const reservations = readSheetRaw(SHEET_RESERVATIONS);
+    if (reservations.headerIndex[RESERVATION_COLUMN_MAP.requestId] === undefined) {
+      const requestIdColumn = reservations.sheet.getLastColumn() + 1;
+      reservations.sheet.getRange(1, requestIdColumn).setValue(RESERVATION_COLUMN_MAP.requestId);
+      reservations.headerIndex[RESERVATION_COLUMN_MAP.requestId] = requestIdColumn - 1;
+    }
+
+    // Um retry do mesmo pedido devolve sucesso sem criar uma segunda reserva.
+    const requestIdColumnIndex = reservations.headerIndex[RESERVATION_COLUMN_MAP.requestId];
+    const duplicate = reservations.rows.some(function (row) {
+      return String(row[requestIdColumnIndex] || '').trim() === requestId;
+    });
+    if (duplicate) {
+      return { success: true, duplicate: true, message: 'Reserva já registada.' };
+    }
+
     // 1. Ler quantidade desejada do produto
     const site = readSheetRaw(SHEET_PRODUCTS);
     const idColIndex = site.headerIndex[COLUMN_MAP.id];
@@ -48,7 +66,6 @@ function createReservation(body) {
     const productName = productRow[nameColIndex];
 
     // 2. Ler reservas atuais e calcular disponibilidade
-    const reservations = readSheetRaw(SHEET_RESERVATIONS);
     const reservationSummary = sumActiveReservationsByProduct(reservations);
     const alreadyReserved = reservationSummary.totals[String(productId)] || 0;
     const available = desiredQuantity - alreadyReserved;
@@ -71,7 +88,8 @@ function createReservation(body) {
       quantity: quantity,
       message: message,
       createdAt: new Date().toISOString(),
-      status: 'confirmed'
+      status: 'confirmed',
+      requestId: requestId
     };
 
     const totalCols = Math.max(

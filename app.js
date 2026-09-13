@@ -6,7 +6,8 @@
   const state = {
     products: [],
     activeCategory: 'Todos',
-    selectedProduct: null
+    selectedProduct: null,
+    selectedRequestId: null
   };
 
   const els = {
@@ -149,6 +150,7 @@
 
   function openModal(product) {
     state.selectedProduct = product;
+    state.selectedRequestId = createRequestId();
     els.modalItemName.textContent = product.name;
     els.modalItemAvailability.textContent = product.available_quantity + ' disponível(is) de ' + product.desired_quantity;
     els.guestName.value = '';
@@ -163,6 +165,7 @@
   function closeModal() {
     els.modalOverlay.classList.add('hidden');
     state.selectedProduct = null;
+    state.selectedRequestId = null;
   }
 
   function handleReserveSubmit(e) {
@@ -178,7 +181,8 @@
       product_id: state.selectedProduct.id,
       guest_name: els.guestName.value.trim(),
       quantity: parseInt(els.guestQuantity.value, 10),
-      message: els.guestMessage.value.trim()
+      message: els.guestMessage.value.trim(),
+      request_id: state.selectedRequestId
     };
 
     fetch(API_URL, {
@@ -216,6 +220,13 @@
     const num = Number(price);
     if (isNaN(num)) return '';
     return num.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+  }
+
+  function createRequestId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'reserve-' + Date.now() + '-' + Math.random().toString(16).slice(2);
   }
 
   function escapeHtml(str) {
