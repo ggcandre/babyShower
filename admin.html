@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administração — Lista de Nascimento</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="page admin-page" id="admin-root">
+
+  <div class="admin-login" id="login-view">
+    <h1>Administração</h1>
+    <div class="field">
+      <label for="admin-key">Chave de administrador</label>
+      <input type="password" id="admin-key" placeholder="Chave secreta">
+    </div>
+    <button class="btn btn-primary" id="login-btn">Entrar</button>
+    <p class="form-message error" id="login-error"></p>
+  </div>
+
+  <div id="app-view" style="display:none;">
+    <header class="hero" style="margin-bottom:32px;">
+      <h1 style="font-size:1.9rem;">Painel de administração</h1>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="products">Produtos</button>
+      <button class="tab-btn" data-tab="reservations">Reservas</button>
+    </div>
+
+    <div id="tab-products">
+      <div class="admin-toolbar">
+        <span></span>
+        <button class="icon-btn" id="add-product-btn">+ Novo produto</button>
+      </div>
+      <div id="products-table-wrap">
+        <div class="loading-state">A carregar produtos…</div>
+      </div>
+    </div>
+
+    <div id="tab-reservations" style="display:none;">
+      <div class="admin-toolbar">
+        <span></span>
+        <button class="icon-btn" id="refresh-reservations-btn">Atualizar</button>
+      </div>
+      <div id="reservations-table-wrap">
+        <div class="loading-state">A carregar reservas…</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal-overlay hidden" id="product-modal-overlay">
+  <div class="modal">
+    <h2 id="product-modal-title">Novo produto</h2>
+    <form id="product-form">
+      <input type="hidden" id="pf-id">
+      <div class="field">
+        <label for="pf-name">Nome</label>
+        <input type="text" id="pf-name" required>
+      </div>
+      <div class="field">
+        <label for="pf-description">Descrição</label>
+        <textarea id="pf-description"></textarea>
+      </div>
+      <div class="field">
+        <label for="pf-category">Categoria</label>
+        <input type="text" id="pf-category">
+      </div>
+      <div class="field">
+        <label for="pf-price">Preço (€)</label>
+        <input type="number" step="0.01" id="pf-price">
+      </div>
+      <div class="field">
+        <label for="pf-quantity">Quantidade desejada</label>
+        <input type="number" min="1" id="pf-quantity" required>
+      </div>
+      <div class="field">
+        <label for="pf-image">URL da imagem</label>
+        <input type="text" id="pf-image">
+      </div>
+      <div class="field">
+        <label for="pf-purchase">Link de compra</label>
+        <input type="text" id="pf-purchase">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="product-modal-cancel">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
+      </div>
+      <p class="form-message" id="product-form-message"></p>
+    </form>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

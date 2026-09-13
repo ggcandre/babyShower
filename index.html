@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lista de Nascimento</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<main class="page">
+  <header class="hero">
+    <h1>A nossa lista de nascimento</h1>
+    <p>
+      Escolham o que quiserem oferecer — cada reserva atualiza a lista na
+      hora, para que ninguém repita a prenda. Obrigado por fazerem parte
+      desta fase connosco.
+    </p>
+  </header>
+
+  <div class="filters" id="filters"></div>
+
+  <div id="content">
+    <div class="loading-state">A carregar a lista…</div>
+  </div>
+</main>
+
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-item-name">Reservar item</h2>
+    <p class="modal-subtitle" id="modal-item-availability"></p>
+
+    <form id="reserve-form">
+      <div class="field">
+        <label for="guest-name">O teu nome</label>
+        <input type="text" id="guest-name" required maxlength="80">
+      </div>
+      <div class="field">
+        <label for="guest-quantity">Quantidade</label>
+        <input type="number" id="guest-quantity" min="1" value="1" required>
+      </div>
+      <div class="field">
+        <label for="guest-message">Mensagem (opcional)</label>
+        <textarea id="guest-message" maxlength="300" placeholder="Com muito carinho 🤍"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="modal-cancel">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="modal-submit">Confirmar reserva</button>
+      </div>
+
+      <p class="form-message" id="form-message"></p>
+    </form>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
