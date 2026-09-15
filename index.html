@@ -2,7 +2,8 @@
 <html lang="pt-PT">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#FBF6EE">
 <title>Lista de Nascimento</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -26,18 +27,19 @@
 </main>
 
 <div class="modal-overlay hidden" id="modal-overlay">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-item-name">
+    <button type="button" class="modal-close-btn" id="modal-close-x" aria-label="Fechar modal">&times;</button>
     <h2 id="modal-item-name">Reservar item</h2>
     <p class="modal-subtitle" id="modal-item-availability"></p>
 
     <form id="reserve-form">
       <div class="field">
         <label for="guest-name">O teu nome</label>
-        <input type="text" id="guest-name" required maxlength="80">
+        <input type="text" id="guest-name" required maxlength="80" autocomplete="name" placeholder="Ex.: Maria Silva">
       </div>
       <div class="field">
         <label for="guest-quantity">Quantidade</label>
-        <input type="number" id="guest-quantity" min="1" value="1" required>
+        <input type="number" id="guest-quantity" min="1" value="1" required inputmode="numeric">
       </div>
       <div class="field">
         <label for="guest-message">Mensagem (opcional)</label>
@@ -46,7 +48,9 @@
 
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" id="modal-cancel">Cancelar</button>
-        <button type="submit" class="btn btn-primary" id="modal-submit">Confirmar reserva</button>
+        <button type="submit" class="btn btn-primary" id="modal-submit">
+          <span class="btn-text">Confirmar reserva</span>
+        </button>
       </div>
 
       <p class="form-message" id="form-message"></p>

@@ -14,6 +14,7 @@
     filters: document.getElementById('filters'),
     content: document.getElementById('content'),
     modalOverlay: document.getElementById('modal-overlay'),
+    modalCloseX: document.getElementById('modal-close-x'),
     modalItemName: document.getElementById('modal-item-name'),
     modalItemAvailability: document.getElementById('modal-item-availability'),
     reserveForm: document.getElementById('reserve-form'),
@@ -31,6 +32,9 @@
   function init() {
     loadProducts();
     els.modalCancel.addEventListener('click', closeModal);
+    if (els.modalCloseX) {
+      els.modalCloseX.addEventListener('click', closeModal);
+    }
     els.modalOverlay.addEventListener('click', function (e) {
       if (e.target === els.modalOverlay) closeModal();
     });
@@ -106,42 +110,49 @@
     const isFull = available <= 0;
 
     const thumb = p.image_url
-      ? '<img class="item-thumb" src="' + escapeAttr(p.image_url) + '" alt="">'
+      ? '<img class="item-thumb" src="' + escapeAttr(p.image_url) + '" alt="' + escapeAttr(p.name || '') + '" loading="lazy">'
       : '<div class="item-thumb-placeholder">' + escapeHtml((p.name || '?').charAt(0)) + '</div>';
 
-    const priceHtml = p.price ? '<div class="item-price">' + formatPrice(p.price) + '</div>' : '';
+    const priceText = p.price ? formatPrice(p.price) : '';
+    const priceMobileHtml = priceText ? '<span class="item-price-mobile">' + priceText + '</span>' : '';
+    const priceDesktopHtml = priceText ? '<div class="item-price-desktop">' + priceText + '</div>' : '';
 
     const actionHtml = isFull
       ? '<span class="tag-full">Já reservado</span>'
-      : '<button class="btn btn-primary" data-reserve-id="' + escapeAttr(p.id) + '">Reservar</button>';
+      : '<button type="button" class="btn btn-primary" data-reserve-id="' + escapeAttr(p.id) + '">Reservar</button>';
 
     const reservedByHtml = (p.reserved_by && p.reserved_by.length)
-      ? '<p class="item-reserved-by"><strong>Reservado por:</strong> ' +
+      ? '<div class="item-reserved-by"><strong>Reservado por:</strong> ' +
         p.reserved_by.map(function (person) {
           return escapeHtml(person.name) + ' (' + Number(person.quantity) + ')';
-        }).join(', ') + '</p>'
+        }).join(', ') + '</div>'
       : '';
 
     const purchaseLink = p.purchase_url
-      ? '<a href="' + escapeAttr(p.purchase_url) + '" target="_blank" rel="noopener" style="font-size:0.82rem;">Ver produto</a>'
+      ? '<a href="' + escapeAttr(p.purchase_url) + '" target="_blank" rel="noopener" class="item-purchase-link">Ver na loja ↗</a>'
       : '';
 
     return (
       '<div class="item-row' + (isFull ? ' is-full' : '') + '">' +
-        thumb +
-        '<div class="item-body">' +
-          '<h3>' + escapeHtml(p.name) + '</h3>' +
-          (p.category ? '<p class="item-category">' + escapeHtml(p.category) + '</p>' : '') +
-          (p.description ? '<p class="item-desc">' + escapeHtml(p.description) + '</p>' : '') +
-          '<div class="item-progress">' +
-            '<div class="item-progress-track"><div class="item-progress-fill" style="width:' + pct + '%"></div></div>' +
-            '<span>' + reserved + ' de ' + desired + ' reservado' + (desired === 1 ? '' : 's') + '</span>' +
+        '<div class="item-header-mobile">' +
+          thumb +
+          '<div class="item-body">' +
+            '<div class="item-title-row">' +
+              '<h3>' + escapeHtml(p.name) + '</h3>' +
+              priceMobileHtml +
+            '</div>' +
+            (p.category ? '<div class="item-category">' + escapeHtml(p.category) + '</div>' : '') +
+            (p.description ? '<p class="item-desc">' + escapeHtml(p.description) + '</p>' : '') +
+            '<div class="item-progress">' +
+              '<div class="item-progress-track"><div class="item-progress-fill" style="width:' + pct + '%"></div></div>' +
+              '<span>' + reserved + ' de ' + desired + ' reservado' + (desired === 1 ? '' : 's') + '</span>' +
+            '</div>' +
+            reservedByHtml +
+            purchaseLink +
           '</div>' +
-          reservedByHtml +
-          purchaseLink +
         '</div>' +
         '<div class="item-actions">' +
-          priceHtml +
+          priceDesktopHtml +
           actionHtml +
         '</div>' +
       '</div>'
@@ -159,20 +170,36 @@
     els.guestMessage.value = '';
     els.formMessage.textContent = '';
     els.formMessage.className = 'form-message';
+    setSubmitLoading(false);
     els.modalOverlay.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
   }
 
   function closeModal() {
     els.modalOverlay.classList.add('hidden');
+    document.body.style.overflow = '';
     state.selectedProduct = null;
     state.selectedRequestId = null;
+    setSubmitLoading(false);
+  }
+
+  function setSubmitLoading(isLoading) {
+    if (!els.modalSubmit) return;
+    els.modalSubmit.disabled = !!isLoading;
+    const btnTextEl = els.modalSubmit.querySelector('.btn-text') || els.modalSubmit;
+    btnTextEl.textContent = isLoading ? 'A registar reserva…' : 'Confirmar reserva';
   }
 
   function handleReserveSubmit(e) {
     e.preventDefault();
     if (!state.selectedProduct) return;
 
-    els.modalSubmit.disabled = true;
+    // Desfoca input para fechar teclado virtual no telemóvel
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+
+    setSubmitLoading(true);
     els.formMessage.textContent = '';
     els.formMessage.className = 'form-message';
 
@@ -190,23 +217,25 @@
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
     })
-      .then(function (res) { return res.json(); })
+      .then(function (res) {
+        return res.json();
+      })
       .then(function (data) {
-        if (data.error) {
+        if (data && data.error) {
           els.formMessage.textContent = data.error;
           els.formMessage.className = 'form-message error';
+          setSubmitLoading(false);
           return;
         }
         closeModal();
         showToast('Reserva efetuada com sucesso. Obrigado! 🤍');
         loadProducts();
       })
-      .catch(function () {
-        els.formMessage.textContent = 'Algo correu mal. Tenta novamente.';
+      .catch(function (err) {
+        console.error('Erro na reserva:', err);
+        els.formMessage.textContent = 'Não foi possível concluir a reserva. Por favor tenta de novo.';
         els.formMessage.className = 'form-message error';
-      })
-      .finally(function () {
-        els.modalSubmit.disabled = false;
+        setSubmitLoading(false);
       });
   }
 
