@@ -260,7 +260,7 @@
     const reservedByHtml = (p.reserved_by && p.reserved_by.length)
       ? '<div class="item-reserved-by"><strong>Reservado por:</strong> ' +
         p.reserved_by.map(function (person) {
-          return escapeHtml(person.name) + ' (' + Number(person.quantity) + ')';
+          return escapeHtml(person.name);
         }).join(', ') + '</div>'
       : '';
 
