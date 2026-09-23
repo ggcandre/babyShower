@@ -3,7 +3,7 @@
 
   const SUPABASE_URL = window.APP_CONFIG.SUPABASE_URL;
   const SUPABASE_ANON_KEY = window.APP_CONFIG.SUPABASE_ANON_KEY;
-  const CACHE_KEY = 'lista_nascimento_products_cache';
+  const CACHE_KEY = 'lista_nascimento_products_cache_v2';
 
   // Inicializa o cliente Supabase
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
