@@ -112,10 +112,10 @@
         const qty = Number(r.quantity) || 0;
         totals[pId] = (totals[pId] || 0) + qty;
 
-        if (!people[pId]) people[pId] = {};
+        if (!people[pId]) people[pId] = [];
         const gName = String(r.guest_name || '').trim();
-        if (gName) {
-          people[pId][gName] = (people[pId][gName] || 0) + qty;
+        if (gName && people[pId].indexOf(gName) === -1) {
+          people[pId].push(gName);
         }
       });
 
@@ -123,11 +123,7 @@
         const pId = String(p.id);
         const desired = Number(p.desired_quantity) || 0;
         const reserved = totals[pId] || 0;
-        const reservedBy = people[pId]
-          ? Object.keys(people[pId]).map(function (name) {
-              return { name: name, quantity: people[pId][name] };
-            })
-          : [];
+        const reservedBy = people[pId] || [];
 
         return {
           id: p.id,
@@ -260,8 +256,9 @@
     const reservedByHtml = (p.reserved_by && p.reserved_by.length)
       ? '<div class="item-reserved-by"><strong>Reservado por:</strong> ' +
         p.reserved_by.map(function (person) {
-          return escapeHtml(person.name);
-        }).join(', ') + '</div>'
+          const name = (typeof person === 'string') ? person : (person && person.name) ? person.name : '';
+          return escapeHtml(name);
+        }).filter(Boolean).join(', ') + '</div>'
       : '';
 
     const purchaseLink = p.purchase_url
