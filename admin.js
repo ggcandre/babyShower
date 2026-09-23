@@ -1,8 +1,14 @@
 (function () {
   'use strict';
 
-  const API_URL = window.APP_CONFIG.API_URL;
+  const SUPABASE_URL = window.APP_CONFIG.SUPABASE_URL;
+  const SUPABASE_ANON_KEY = window.APP_CONFIG.SUPABASE_ANON_KEY;
   const STORAGE_KEY = 'lista_nascimento_admin_key';
+
+  // Chave de acesso ao painel de administração (podes alterar para a tua palavra-passe preferida)
+  const ADMIN_SECRET = 'BabyshowerSementinha2026';
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const state = {
     apiKey: sessionStorage.getItem(STORAGE_KEY) || '',
@@ -65,6 +71,10 @@
   function handleLogin() {
     const key = els.adminKeyInput.value.trim();
     if (!key) return;
+    if (key !== ADMIN_SECRET) {
+      els.loginError.textContent = 'Chave incorreta.';
+      return;
+    }
     state.apiKey = key;
     sessionStorage.setItem(STORAGE_KEY, key);
     els.loginError.textContent = '';
@@ -75,14 +85,6 @@
     els.loginView.style.display = 'none';
     els.appView.style.display = 'block';
     loadProducts();
-  }
-
-  function logout(message) {
-    sessionStorage.removeItem(STORAGE_KEY);
-    state.apiKey = '';
-    els.appView.style.display = 'none';
-    els.loginView.style.display = 'block';
-    els.loginError.textContent = message || '';
   }
 
   function switchTab(tab) {
@@ -101,13 +103,43 @@
   // Produtos
   // ------------------------------------------------------------------
 
-  function loadProducts() {
-    apiGet('admin_products')
-      .then(function (data) {
-        state.products = data.products || [];
-        renderProductsTable();
-      })
-      .catch(handleApiError);
+  async function loadProducts() {
+    els.productsTableWrap.innerHTML = '<div class="loading-state">A carregar produtos…</div>';
+    try {
+      const [productsRes, reservationsRes] = await Promise.all([
+        supabase
+          .from('products')
+          .select('*')
+          .order('id', { ascending: true }),
+        supabase
+          .from('reservations')
+          .select('product_id, quantity')
+          .in('status', ['confirmed', 'pending'])
+      ]);
+
+      if (productsRes.error) throw productsRes.error;
+      if (reservationsRes.error) throw reservationsRes.error;
+
+      const rawProducts = productsRes.data || [];
+      const rawReservations = reservationsRes.data || [];
+
+      const totals = {};
+      rawReservations.forEach(function (r) {
+        const pId = String(r.product_id);
+        totals[pId] = (totals[pId] || 0) + (Number(r.quantity) || 0);
+      });
+
+      state.products = rawProducts.map(function (p) {
+        return Object.assign({}, p, {
+          reserved_quantity: totals[String(p.id)] || 0
+        });
+      });
+
+      renderProductsTable();
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao carregar produtos.');
+    }
   }
 
   function renderProductsTable() {
@@ -171,7 +203,7 @@
     els.productModalOverlay.classList.add('hidden');
   }
 
-  function handleProductSubmit(e) {
+  async function handleProductSubmit(e) {
     e.preventDefault();
     const id = els.pf.id.value;
     const payload = {
@@ -179,49 +211,86 @@
       description: els.pf.description.value.trim(),
       category: els.pf.category.value.trim(),
       price: parseFloat(els.pf.price.value) || 0,
-      desired_quantity: parseInt(els.pf.quantity.value, 10) || 0,
+      desired_quantity: parseInt(els.pf.quantity.value, 10) || 1,
       image_url: els.pf.image.value.trim(),
-      purchase_url: els.pf.purchase.value.trim()
+      purchase_url: els.pf.purchase.value.trim(),
+      updated_at: new Date().toISOString()
     };
 
-    const action = id ? 'update_product' : 'add_product';
-    if (id) payload.id = id;
+    try {
+      if (id) {
+        const { error } = await supabase
+          .from('products')
+          .update(payload)
+          .eq('id', id);
+        if (error) throw error;
+      } else {
+        payload.active = true;
+        const { error } = await supabase
+          .from('products')
+          .insert([payload]);
+        if (error) throw error;
+      }
 
-    apiPost(action, payload)
-      .then(function (data) {
-        if (data.error) {
-          els.productFormMessage.textContent = data.error;
-          els.productFormMessage.className = 'form-message error';
-          return;
-        }
-        closeProductModal();
-        showToast('Produto guardado.');
-        loadProducts();
-      })
-      .catch(handleApiError);
+      closeProductModal();
+      showToast('Produto guardado com sucesso.');
+      loadProducts();
+    } catch (err) {
+      console.error(err);
+      els.productFormMessage.textContent = err.message || 'Erro ao guardar produto.';
+      els.productFormMessage.className = 'form-message error';
+    }
   }
 
-  function toggleActive(id) {
-    apiPost('toggle_active', { id: id })
-      .then(function (data) {
-        if (data.error) { showToast(data.error); return; }
-        loadProducts();
-      })
-      .catch(handleApiError);
+  async function toggleActive(id) {
+    const p = state.products.find(function (x) { return String(x.id) === String(id); });
+    if (!p) return;
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ active: !p.active, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+      loadProducts();
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao atualizar estado.');
+    }
   }
 
   // ------------------------------------------------------------------
   // Reservas
   // ------------------------------------------------------------------
 
-  function loadReservations() {
+  async function loadReservations() {
     els.reservationsTableWrap.innerHTML = '<div class="loading-state">A carregar reservas…</div>';
-    apiGet('admin_reservations')
-      .then(function (data) {
-        state.reservations = data.reservations || [];
-        renderReservationsTable();
-      })
-      .catch(handleApiError);
+    try {
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('*, products(name)')
+        .order('id', { ascending: false });
+
+      if (error) throw error;
+
+      state.reservations = (data || []).map(function (r) {
+        return {
+          id: r.id,
+          product_name: (r.products && r.products.name) ? r.products.name : '—',
+          guest_name: r.guest_name,
+          quantity: r.quantity,
+          message: r.message,
+          status: r.status,
+          created_at: r.created_at
+        };
+      });
+
+      renderReservationsTable();
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao carregar reservas.');
+    }
   }
 
   function renderReservationsTable() {
@@ -251,79 +320,25 @@
       '</table>';
 
     Array.from(els.reservationsTableWrap.querySelectorAll('[data-cancel-id]')).forEach(function (btn) {
-      btn.addEventListener('click', function () {
+      btn.addEventListener('click', async function () {
         if (!confirm('Cancelar esta reserva?')) return;
-        apiPost('cancel_reservation', { id: btn.getAttribute('data-cancel-id') })
-          .then(function (data) {
-            if (data.error) { showToast(data.error); return; }
-            loadReservations();
-            loadProducts();
-          })
-          .catch(handleApiError);
+        const resId = btn.getAttribute('data-cancel-id');
+        try {
+          const { error } = await supabase
+            .from('reservations')
+            .update({ status: 'cancelled' })
+            .eq('id', resId);
+
+          if (error) throw error;
+          showToast('Reserva cancelada.');
+          loadReservations();
+          loadProducts();
+        } catch (err) {
+          console.error(err);
+          showToast('Erro ao cancelar reserva.');
+        }
       });
     });
-  }
-
-  // ------------------------------------------------------------------
-  // API helpers
-  // ------------------------------------------------------------------
-
-  function fetchWithRetry(url, options, retries, delay) {
-    retries = (retries !== undefined) ? retries : 2;
-    delay = (delay !== undefined) ? delay : 1000;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(function () {
-      controller.abort();
-    }, 20000); // 20s timeout
-
-    const fetchOptions = Object.assign({}, options || {}, { signal: controller.signal });
-
-    return fetch(url, fetchOptions)
-      .then(function (res) {
-        clearTimeout(timeoutId);
-        return res.json();
-      })
-      .catch(function (err) {
-        clearTimeout(timeoutId);
-        if (retries > 0) {
-          return new Promise(function (resolve) {
-            setTimeout(resolve, delay);
-          }).then(function () {
-            return fetchWithRetry(url, options, retries - 1, delay * 2);
-          });
-        }
-        throw err;
-      });
-  }
-
-  function apiGet(action) {
-    return fetchWithRetry(API_URL + '?action=' + encodeURIComponent(action) + '&apiKey=' + encodeURIComponent(state.apiKey))
-      .then(checkAuthError);
-  }
-
-  function apiPost(action, payload) {
-    const body = Object.assign({ action: action, apiKey: state.apiKey }, payload);
-    return fetchWithRetry(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body)
-    }, 1, 1500)
-      .then(checkAuthError);
-  }
-
-  function checkAuthError(data) {
-    if (data && data.status === 401) {
-      logout('Chave de administrador inválida.');
-      throw new Error('unauthorized');
-    }
-    return data;
-  }
-
-  function handleApiError(err) {
-    if (err && err.message === 'unauthorized') return;
-    console.error(err);
-    showToast('Ocorreu um erro. Tenta novamente.');
   }
 
   function showToast(message) {

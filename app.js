@@ -1,8 +1,12 @@
 (function () {
   'use strict';
 
-  const API_URL = window.APP_CONFIG.API_URL;
+  const SUPABASE_URL = window.APP_CONFIG.SUPABASE_URL;
+  const SUPABASE_ANON_KEY = window.APP_CONFIG.SUPABASE_ANON_KEY;
   const CACHE_KEY = 'lista_nascimento_products_cache';
+
+  // Inicializa o cliente Supabase
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const state = {
     products: [],
@@ -31,17 +35,19 @@
   init();
 
   function init() {
-    // 1. Carrega imediatamente da cache local (se existir) para render instantâneo (<50ms)
+    // 1. Carrega imediatamente da cache local (se existir) para render instantâneo (<30ms)
     const cached = getLocalCache();
     if (cached && Array.isArray(cached) && cached.length > 0) {
       state.products = cached;
       renderFilters();
       renderList();
-      // Atualiza em segundo plano silenciosamente
       loadProducts(true);
     } else {
       loadProducts(false);
     }
+
+    // 2. Subscreve a atualizações em TEMPO REAL (Realtime)
+    setupRealtimeSubscription();
 
     els.modalCancel.addEventListener('click', closeModal);
     if (els.modalCloseX) {
@@ -66,64 +72,110 @@
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(products));
     } catch (e) {
-      // Ignora erros de quota de localStorage
+      // Ignora erros de quota
     }
   }
 
   /**
-   * Executa um fetch com timeout e retentativas automáticas (backoff exponencial)
-   * para lidar de forma robusta com cold starts do Apps Script ou falhas de rede.
+   * Obtém produtos e reservas ativas diretamente do Supabase e calcula disponibilidades.
    */
-  function fetchWithRetry(url, options, retries, delay) {
-    retries = (retries !== undefined) ? retries : 2;
-    delay = (delay !== undefined) ? delay : 1000;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(function () {
-      controller.abort();
-    }, 18000); // 18s timeout
-
-    const fetchOptions = Object.assign({}, options || {}, { signal: controller.signal });
-
-    return fetch(url, fetchOptions)
-      .then(function (res) {
-        clearTimeout(timeoutId);
-        return res.json();
-      })
-      .catch(function (err) {
-        clearTimeout(timeoutId);
-        if (retries > 0) {
-          return new Promise(function (resolve) {
-            setTimeout(resolve, delay);
-          }).then(function () {
-            return fetchWithRetry(url, options, retries - 1, delay * 2);
-          });
-        }
-        throw err;
-      });
-  }
-
-  function loadProducts(isSilent) {
+  async function loadProducts(isSilent) {
     if (!isSilent && state.products.length === 0) {
       els.content.innerHTML = '<div class="loading-state">A carregar a lista…</div>';
     }
 
-    fetchWithRetry(API_URL + '?action=products')
-      .then(function (data) {
-        if (data && data.error) throw new Error(data.error);
-        const products = data.products || [];
-        state.products = products;
-        setLocalCache(products);
-        renderFilters();
-        renderList();
-      })
-      .catch(function (err) {
-        console.error('Erro ao carregar produtos:', err);
-        // Se já tiver produtos carregados da cache, não substitui por erro
-        if (state.products.length === 0) {
-          renderErrorState();
+    try {
+      // Pedidos em paralelo ultra rápidos
+      const [productsRes, reservationsRes] = await Promise.all([
+        supabase
+          .from('products')
+          .select('*')
+          .eq('active', true)
+          .order('id', { ascending: true }),
+        supabase
+          .from('reservations')
+          .select('product_id, guest_name, quantity, status')
+          .in('status', ['confirmed', 'pending'])
+      ]);
+
+      if (productsRes.error) throw productsRes.error;
+      if (reservationsRes.error) throw reservationsRes.error;
+
+      const rawProducts = productsRes.data || [];
+      const rawReservations = reservationsRes.data || [];
+
+      // Resumo de reservas por produto
+      const totals = {};
+      const people = {};
+      rawReservations.forEach(function (r) {
+        const pId = String(r.product_id);
+        const qty = Number(r.quantity) || 0;
+        totals[pId] = (totals[pId] || 0) + qty;
+
+        if (!people[pId]) people[pId] = {};
+        const gName = String(r.guest_name || '').trim();
+        if (gName) {
+          people[pId][gName] = (people[pId][gName] || 0) + qty;
         }
       });
+
+      const processed = rawProducts.map(function (p) {
+        const pId = String(p.id);
+        const desired = Number(p.desired_quantity) || 0;
+        const reserved = totals[pId] || 0;
+        const reservedBy = people[pId]
+          ? Object.keys(people[pId]).map(function (name) {
+              return { name: name, quantity: people[pId][name] };
+            })
+          : [];
+
+        return {
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          category: p.category,
+          price: p.price,
+          desired_quantity: desired,
+          reserved_quantity: reserved,
+          reserved_by: reservedBy,
+          available_quantity: Math.max(0, desired - reserved),
+          image_url: p.image_url,
+          purchase_url: p.purchase_url,
+          active: p.active
+        };
+      });
+
+      state.products = processed;
+      setLocalCache(processed);
+      renderFilters();
+      renderList();
+    } catch (err) {
+      console.error('Erro ao carregar produtos do Supabase:', err);
+      if (state.products.length === 0) {
+        renderErrorState();
+      }
+    }
+  }
+
+  function setupRealtimeSubscription() {
+    supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reservations' },
+        function () {
+          // Quando qualquer reserva for feita/alterada, atualiza em background
+          loadProducts(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        function () {
+          loadProducts(true);
+        }
+      )
+      .subscribe();
   }
 
   function renderErrorState() {
@@ -274,11 +326,10 @@
     btnTextEl.textContent = isLoading ? 'A registar reserva…' : 'Confirmar reserva';
   }
 
-  function handleReserveSubmit(e) {
+  async function handleReserveSubmit(e) {
     e.preventDefault();
     if (!state.selectedProduct) return;
 
-    // Desfoca input para fechar teclado virtual no telemóvel
     if (document.activeElement && typeof document.activeElement.blur === 'function') {
       document.activeElement.blur();
     }
@@ -292,62 +343,29 @@
     const guestQty = parseInt(els.guestQuantity.value, 10);
     const guestMsg = els.guestMessage.value.trim();
 
-    const payload = {
-      action: 'reserve',
-      product_id: selectedProd.id,
-      guest_name: guestName,
-      quantity: guestQty,
-      message: guestMsg,
-      request_id: state.selectedRequestId
-    };
-
-    fetchWithRetry(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    }, 1, 1500)
-      .then(function (data) {
-        if (data && data.error) {
-          els.formMessage.textContent = data.error;
-          els.formMessage.className = 'form-message error';
-          setSubmitLoading(false);
-          return;
-        }
-
-        closeModal();
-        showToast('Reserva efetuada com sucesso. Obrigado! 🤍');
-
-        // Se o backend devolveu a lista atualizada de produtos, usamos logo
-        if (data && data.products && Array.isArray(data.products)) {
-          state.products = data.products;
-          setLocalCache(data.products);
-          renderFilters();
-          renderList();
-        } else {
-          // Atualização otimista imediata para não deixar a interface à espera
-          applyOptimisticReservation(selectedProd.id, guestName, guestQty);
-          loadProducts(true);
-        }
-      })
-      .catch(function (err) {
-        console.error('Erro na reserva:', err);
-        els.formMessage.textContent = 'Não foi possível concluir a reserva. Por favor tenta de novo.';
-        els.formMessage.className = 'form-message error';
-        setSubmitLoading(false);
+    try {
+      // Chama a função RPC atómica do Postgres no Supabase
+      const { data, error } = await supabase.rpc('make_reservation', {
+        p_product_id: selectedProd.id,
+        p_guest_name: guestName,
+        p_quantity: guestQty,
+        p_message: guestMsg,
+        p_request_id: state.selectedRequestId
       });
-  }
 
-  function applyOptimisticReservation(productId, guestName, quantity) {
-    const prod = state.products.find(function (p) { return String(p.id) === String(productId); });
-    if (!prod) return;
+      if (error) {
+        throw error;
+      }
 
-    prod.reserved_quantity = (Number(prod.reserved_quantity) || 0) + quantity;
-    prod.available_quantity = Math.max(0, (Number(prod.available_quantity) || 0) - quantity);
-    if (!prod.reserved_by) prod.reserved_by = [];
-    prod.reserved_by.push({ name: guestName, quantity: quantity });
-
-    setLocalCache(state.products);
-    renderList();
+      closeModal();
+      showToast('Reserva efetuada com sucesso. Obrigado! 🤍');
+      loadProducts(true);
+    } catch (err) {
+      console.error('Erro na reserva:', err);
+      els.formMessage.textContent = err.message || 'Não foi possível concluir a reserva. Por favor tenta de novo.';
+      els.formMessage.className = 'form-message error';
+      setSubmitLoading(false);
+    }
   }
 
   function showToast(message) {
