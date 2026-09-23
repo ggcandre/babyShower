@@ -26,14 +26,16 @@ function createReservation(body) {
   }
 
   const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  if (!lock.tryLock(15000)) {
+    throw new AppError('O servidor está ocupado a processar outra reserva. Por favor tenta de novo dentro de instantes.', 503);
+  }
   try {
     // Criar a coluna automaticamente em folhas antigas, sem apagar dados.
     const reservations = readSheetRaw(SHEET_RESERVATIONS);
     if (reservations.headerIndex[RESERVATION_COLUMN_MAP.requestId] === undefined) {
-      const requestIdColumn = reservations.sheet.getLastColumn() + 1;
-      reservations.sheet.getRange(1, requestIdColumn).setValue(RESERVATION_COLUMN_MAP.requestId);
-      reservations.headerIndex[RESERVATION_COLUMN_MAP.requestId] = requestIdColumn - 1;
+      const numCols = Object.keys(reservations.headerIndex).length;
+      reservations.sheet.getRange(1, numCols + 1).setValue(RESERVATION_COLUMN_MAP.requestId);
+      reservations.headerIndex[RESERVATION_COLUMN_MAP.requestId] = numCols;
     }
 
     // Um retry do mesmo pedido devolve sucesso sem criar uma segunda reserva.
@@ -42,7 +44,12 @@ function createReservation(body) {
       return String(row[requestIdColumnIndex] || '').trim() === requestId;
     });
     if (duplicate) {
-      return { success: true, duplicate: true, message: 'Reserva já registada.' };
+      return { 
+        success: true, 
+        duplicate: true, 
+        message: 'Reserva já registada.',
+        products: getPublicProducts()
+      };
     }
 
     // 1. Ler quantidade desejada do produto
@@ -93,8 +100,8 @@ function createReservation(body) {
     };
 
     const totalCols = Math.max(
-      reservations.sheet.getLastColumn(),
-      Object.keys(reservations.headerIndex).length
+      Object.keys(reservations.headerIndex).length,
+      RESERVATIONS_HEADERS.length
     );
     const row = objectToRow(
       reservationObj,
@@ -105,7 +112,11 @@ function createReservation(body) {
     reservations.sheet.appendRow(row);
     invalidatePublicProductsCache();
 
-    return { success: true, message: 'Reserva efetuada com sucesso.' };
+    return { 
+      success: true, 
+      message: 'Reserva efetuada com sucesso.',
+      products: getPublicProducts()
+    };
   } finally {
     // 5. Libertar lock (sempre, mesmo em caso de erro)
     lock.releaseLock();
@@ -145,7 +156,9 @@ function cancelReservation(body) {
   }
 
   const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  if (!lock.tryLock(15000)) {
+    throw new AppError('O servidor está ocupado. Por favor tenta novamente.', 503);
+  }
   try {
     const reservations = readSheetRaw(SHEET_RESERVATIONS);
     const idColIndex = reservations.headerIndex[RESERVATION_COLUMN_MAP.id];

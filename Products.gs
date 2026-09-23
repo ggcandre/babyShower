@@ -4,15 +4,22 @@
  * ============================================================================
  */
 
+const PUBLIC_CACHE_KEY = 'public_products_v2';
+const PUBLIC_CACHE_TTL = 600; // 10 minutos (invalidado imediatamente em qualquer escrita)
+
 /**
  * Devolve os produtos ativos, apenas com os campos que os convidados
  * podem ver. Nunca inclui dados administrativos.
  */
 function getPublicProducts() {
-  const cache = CacheService.getScriptCache();
-  const cached = cache.get('public_products');
-  if (cached) {
-    return JSON.parse(cached);
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(PUBLIC_CACHE_KEY);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    Logger.log('Cache read error: ' + e);
   }
 
   const products = getAllProductsWithAvailability();
@@ -35,12 +42,25 @@ function getPublicProducts() {
       };
     });
 
-  cache.put('public_products', JSON.stringify(publicProducts), 30);
+  try {
+    const jsonStr = JSON.stringify(publicProducts);
+    // Limite do CacheService do Apps Script é 100KB (100.000 caracteres)
+    if (jsonStr.length < 90000) {
+      CacheService.getScriptCache().put(PUBLIC_CACHE_KEY, jsonStr, PUBLIC_CACHE_TTL);
+    }
+  } catch (e) {
+    Logger.log('Cache write error: ' + e);
+  }
+
   return publicProducts;
 }
 
 function invalidatePublicProductsCache() {
-  CacheService.getScriptCache().remove('public_products');
+  try {
+    CacheService.getScriptCache().remove(PUBLIC_CACHE_KEY);
+  } catch (e) {
+    Logger.log('Cache remove error: ' + e);
+  }
 }
 
 /**
@@ -128,7 +148,9 @@ function sumActiveReservationsByProduct(reservationsData) {
  */
 function addProduct(body) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  if (!lock.tryLock(15000)) {
+    throw new AppError('O servidor está ocupado. Por favor tenta novamente.', 503);
+  }
   try {
     const site = readSheetRaw(SHEET_PRODUCTS);
     const newId = nextNumericId(site.rows, site.headerIndex, COLUMN_MAP);
@@ -148,7 +170,10 @@ function addProduct(body) {
       updatedAt: now
     };
 
-    const totalCols = Math.max(site.sheet.getLastColumn(), Object.keys(site.headerIndex).length);
+    const totalCols = Math.max(
+      Object.keys(site.headerIndex).length,
+      SITE_HEADERS.length
+    );
     const row = objectToRow(obj, site.headerIndex, COLUMN_MAP, new Array(totalCols).fill(''));
     site.sheet.appendRow(row);
     invalidatePublicProductsCache();
@@ -169,7 +194,9 @@ function updateProduct(body) {
   }
 
   const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  if (!lock.tryLock(15000)) {
+    throw new AppError('O servidor está ocupado. Por favor tenta novamente.', 503);
+  }
   try {
     const site = readSheetRaw(SHEET_PRODUCTS);
     const idColIndex = site.headerIndex[COLUMN_MAP.id];
@@ -217,7 +244,9 @@ function toggleProductActive(body) {
   }
 
   const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  if (!lock.tryLock(15000)) {
+    throw new AppError('O servidor está ocupado. Por favor tenta novamente.', 503);
+  }
   try {
     const site = readSheetRaw(SHEET_PRODUCTS);
     const idColIndex = site.headerIndex[COLUMN_MAP.id];

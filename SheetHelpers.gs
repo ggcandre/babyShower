@@ -7,8 +7,17 @@
  * tudo é resolvido por nome de cabeçalho (ver buildHeaderIndex).
  */
 
+let _cachedSpreadsheet = null;
+
+function getSpreadsheet() {
+  if (!_cachedSpreadsheet) {
+    _cachedSpreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  }
+  return _cachedSpreadsheet;
+}
+
 function getSheet(sheetName) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = getSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
     throw new AppError('Folha "' + sheetName + '" não encontrada na spreadsheet.', 500);
@@ -17,20 +26,20 @@ function getSheet(sheetName) {
 }
 
 /**
- * Lê todas as linhas de uma folha e devolve { headerIndex, rows },
+ * Lê todas as linhas de uma folha e devolve { headerIndex, rows, sheet },
  * onde rows é um array de arrays (linhas cruas, sem o cabeçalho) e
  * headerIndex mapeia nome de cabeçalho -> índice de coluna (0-based).
+ * Usa getDataRange().getValues() para obter tudo numa única chamada RPC rápida.
  */
 function readSheetRaw(sheetName) {
   const sheet = getSheet(sheetName);
-  const lastRow = sheet.getLastRow();
-  const lastCol = sheet.getLastColumn();
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
 
-  if (lastRow < 1 || lastCol < 1) {
+  if (!values || values.length === 0 || values[0].length === 0) {
     return { headerIndex: {}, rows: [], sheet: sheet };
   }
 
-  const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
   const headerRow = values[0];
   const headerIndex = buildHeaderIndex(headerRow);
   const rows = values.slice(1);

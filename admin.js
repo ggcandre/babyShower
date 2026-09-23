@@ -268,20 +268,47 @@
   // API helpers
   // ------------------------------------------------------------------
 
+  function fetchWithRetry(url, options, retries, delay) {
+    retries = (retries !== undefined) ? retries : 2;
+    delay = (delay !== undefined) ? delay : 1000;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(function () {
+      controller.abort();
+    }, 20000); // 20s timeout
+
+    const fetchOptions = Object.assign({}, options || {}, { signal: controller.signal });
+
+    return fetch(url, fetchOptions)
+      .then(function (res) {
+        clearTimeout(timeoutId);
+        return res.json();
+      })
+      .catch(function (err) {
+        clearTimeout(timeoutId);
+        if (retries > 0) {
+          return new Promise(function (resolve) {
+            setTimeout(resolve, delay);
+          }).then(function () {
+            return fetchWithRetry(url, options, retries - 1, delay * 2);
+          });
+        }
+        throw err;
+      });
+  }
+
   function apiGet(action) {
-    return fetch(API_URL + '?action=' + encodeURIComponent(action) + '&apiKey=' + encodeURIComponent(state.apiKey))
-      .then(function (res) { return res.json(); })
+    return fetchWithRetry(API_URL + '?action=' + encodeURIComponent(action) + '&apiKey=' + encodeURIComponent(state.apiKey))
       .then(checkAuthError);
   }
 
   function apiPost(action, payload) {
     const body = Object.assign({ action: action, apiKey: state.apiKey }, payload);
-    return fetch(API_URL, {
+    return fetchWithRetry(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body)
-    })
-      .then(function (res) { return res.json(); })
+    }, 1, 1500)
       .then(checkAuthError);
   }
 

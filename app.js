@@ -2,6 +2,7 @@
   'use strict';
 
   const API_URL = window.APP_CONFIG.API_URL;
+  const CACHE_KEY = 'lista_nascimento_products_cache';
 
   const state = {
     products: [],
@@ -30,7 +31,18 @@
   init();
 
   function init() {
-    loadProducts();
+    // 1. Carrega imediatamente da cache local (se existir) para render instantâneo (<50ms)
+    const cached = getLocalCache();
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      state.products = cached;
+      renderFilters();
+      renderList();
+      // Atualiza em segundo plano silenciosamente
+      loadProducts(true);
+    } else {
+      loadProducts(false);
+    }
+
     els.modalCancel.addEventListener('click', closeModal);
     if (els.modalCloseX) {
       els.modalCloseX.addEventListener('click', closeModal);
@@ -41,19 +53,91 @@
     els.reserveForm.addEventListener('submit', handleReserveSubmit);
   }
 
-  function loadProducts() {
-    fetch(API_URL + '?action=products')
-      .then(function (res) { return res.json(); })
+  function getLocalCache() {
+    try {
+      const data = localStorage.getItem(CACHE_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setLocalCache(products) {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(products));
+    } catch (e) {
+      // Ignora erros de quota de localStorage
+    }
+  }
+
+  /**
+   * Executa um fetch com timeout e retentativas automáticas (backoff exponencial)
+   * para lidar de forma robusta com cold starts do Apps Script ou falhas de rede.
+   */
+  function fetchWithRetry(url, options, retries, delay) {
+    retries = (retries !== undefined) ? retries : 2;
+    delay = (delay !== undefined) ? delay : 1000;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(function () {
+      controller.abort();
+    }, 18000); // 18s timeout
+
+    const fetchOptions = Object.assign({}, options || {}, { signal: controller.signal });
+
+    return fetch(url, fetchOptions)
+      .then(function (res) {
+        clearTimeout(timeoutId);
+        return res.json();
+      })
+      .catch(function (err) {
+        clearTimeout(timeoutId);
+        if (retries > 0) {
+          return new Promise(function (resolve) {
+            setTimeout(resolve, delay);
+          }).then(function () {
+            return fetchWithRetry(url, options, retries - 1, delay * 2);
+          });
+        }
+        throw err;
+      });
+  }
+
+  function loadProducts(isSilent) {
+    if (!isSilent && state.products.length === 0) {
+      els.content.innerHTML = '<div class="loading-state">A carregar a lista…</div>';
+    }
+
+    fetchWithRetry(API_URL + '?action=products')
       .then(function (data) {
-        if (data.error) throw new Error(data.error);
-        state.products = data.products || [];
+        if (data && data.error) throw new Error(data.error);
+        const products = data.products || [];
+        state.products = products;
+        setLocalCache(products);
         renderFilters();
         renderList();
       })
       .catch(function (err) {
-        els.content.innerHTML = '<div class="error-state">Não foi possível carregar a lista. Tenta novamente mais tarde.</div>';
-        console.error(err);
+        console.error('Erro ao carregar produtos:', err);
+        // Se já tiver produtos carregados da cache, não substitui por erro
+        if (state.products.length === 0) {
+          renderErrorState();
+        }
       });
+  }
+
+  function renderErrorState() {
+    els.content.innerHTML =
+      '<div class="error-state">' +
+        '<p>Não foi possível carregar a lista no momento.</p>' +
+        '<button type="button" class="btn btn-secondary" id="retry-btn" style="margin-top:12px;">Tentar novamente</button>' +
+      '</div>';
+    const retryBtn = document.getElementById('retry-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', function () {
+        loadProducts(false);
+      });
+    }
   }
 
   function renderFilters() {
@@ -203,23 +287,25 @@
     els.formMessage.textContent = '';
     els.formMessage.className = 'form-message';
 
+    const selectedProd = state.selectedProduct;
+    const guestName = els.guestName.value.trim();
+    const guestQty = parseInt(els.guestQuantity.value, 10);
+    const guestMsg = els.guestMessage.value.trim();
+
     const payload = {
       action: 'reserve',
-      product_id: state.selectedProduct.id,
-      guest_name: els.guestName.value.trim(),
-      quantity: parseInt(els.guestQuantity.value, 10),
-      message: els.guestMessage.value.trim(),
+      product_id: selectedProd.id,
+      guest_name: guestName,
+      quantity: guestQty,
+      message: guestMsg,
       request_id: state.selectedRequestId
     };
 
-    fetch(API_URL, {
+    fetchWithRetry(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload)
-    })
-      .then(function (res) {
-        return res.json();
-      })
+    }, 1, 1500)
       .then(function (data) {
         if (data && data.error) {
           els.formMessage.textContent = data.error;
@@ -227,9 +313,21 @@
           setSubmitLoading(false);
           return;
         }
+
         closeModal();
         showToast('Reserva efetuada com sucesso. Obrigado! 🤍');
-        loadProducts();
+
+        // Se o backend devolveu a lista atualizada de produtos, usamos logo
+        if (data && data.products && Array.isArray(data.products)) {
+          state.products = data.products;
+          setLocalCache(data.products);
+          renderFilters();
+          renderList();
+        } else {
+          // Atualização otimista imediata para não deixar a interface à espera
+          applyOptimisticReservation(selectedProd.id, guestName, guestQty);
+          loadProducts(true);
+        }
       })
       .catch(function (err) {
         console.error('Erro na reserva:', err);
@@ -237,6 +335,19 @@
         els.formMessage.className = 'form-message error';
         setSubmitLoading(false);
       });
+  }
+
+  function applyOptimisticReservation(productId, guestName, quantity) {
+    const prod = state.products.find(function (p) { return String(p.id) === String(productId); });
+    if (!prod) return;
+
+    prod.reserved_quantity = (Number(prod.reserved_quantity) || 0) + quantity;
+    prod.available_quantity = Math.max(0, (Number(prod.available_quantity) || 0) - quantity);
+    if (!prod.reserved_by) prod.reserved_by = [];
+    prod.reserved_by.push({ name: guestName, quantity: quantity });
+
+    setLocalCache(state.products);
+    renderList();
   }
 
   function showToast(message) {
