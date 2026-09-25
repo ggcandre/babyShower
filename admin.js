@@ -153,8 +153,20 @@
     }
 
     const rows = state.products.map(function (p) {
-      const statusClass = p.active ? 'active' : 'inactive';
-      const statusLabel = p.active ? 'Ativo' : 'Inativo';
+      const desired = Number(p.desired_quantity) || 0;
+      const reserved = Number(p.reserved_quantity) || 0;
+      const fullyReserved = desired > 0 && reserved >= desired;
+      const partiallyReserved = reserved > 0 && reserved < desired;
+      const statusClass = fullyReserved
+        ? 'confirmed'
+        : partiallyReserved
+          ? 'pending'
+          : (p.active ? 'active' : 'inactive');
+      const statusLabel = fullyReserved
+        ? 'Reservado'
+        : partiallyReserved
+          ? 'Parcialmente reservado'
+          : (p.active ? 'Ativo' : 'Inativo');
       return (
         '<tr>' +
           '<td>' + escapeHtml(p.name) + '</td>' +
