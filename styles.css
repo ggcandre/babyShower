@@ -152,6 +152,13 @@ button {
   margin-bottom: 0;
 }
 
+.rsvp-divider {
+  display: block;
+  width: 72px;
+  height: auto;
+  margin: 18px auto 0;
+}
+
 .hero-divider {
   align-items: center;
   display: flex;
@@ -351,14 +358,14 @@ button {
   font-size: 1.25rem;
   line-height: 1.3;
   margin: 0;
-  color: var(--color-ink);
+  color: #96693e;
 }
 
 .item-price-mobile {
   font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 500;
-  color: var(--color-ink);
+  color: #365777;
   white-space: nowrap;
 }
 
@@ -369,7 +376,7 @@ button {
 }
 
 .item-body .item-category {
-  color: var(--color-sage-dark);
+  color: #365777;
   font-size: 0.8rem;
   font-weight: 500;
   text-transform: uppercase;
@@ -429,7 +436,7 @@ button {
   align-items: center;
   gap: 4px;
   font-size: 0.84rem;
-  color: var(--color-sage-dark);
+  color: #365777;
   text-decoration: none;
   margin-top: 4px;
   padding: 4px 0;
@@ -468,6 +475,7 @@ button {
     font-family: var(--font-display);
     font-size: 1.15rem;
     font-weight: 500;
+    color: #365777;
   }
 }
 
@@ -493,6 +501,14 @@ button {
 
 .item-actions .btn {
   flex: 1;
+}
+
+.item-actions .btn-primary {
+  background: #96693e;
+}
+
+.item-actions .btn-primary:hover {
+  background: #7d5431;
 }
 
 @media (min-width: 640px) {
