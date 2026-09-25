@@ -189,8 +189,8 @@ button {
 
 .welcome-image {
   display: block;
-  width: 33.333%;
-  max-width: 220px;
+  width: 66.666%;
+  max-width: 440px;
   height: auto;
   margin: 30px auto 34px;
   border-radius: var(--radius);
