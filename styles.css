@@ -187,6 +187,15 @@ button {
   font-size: 1.15em;
 }
 
+.welcome-image {
+  display: block;
+  width: 33.333%;
+  max-width: 220px;
+  height: auto;
+  margin: 30px auto 34px;
+  border-radius: var(--radius);
+}
+
 .hero a:hover {
   color: #203e5c;
 }
