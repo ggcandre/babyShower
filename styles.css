@@ -33,9 +33,9 @@ body {
     linear-gradient(rgba(251, 246, 238, 0.75), rgba(251, 246, 238, 0.75)),
     url('background-tile.png');
   background-position: top center;
-  background-size: 40% auto;
+  background-size: 320px auto;
   background-repeat: repeat;
-  background-attachment: fixed;
+  background-attachment: scroll;
   color: var(--color-ink);
   font-family: var(--font-body);
   line-height: 1.5;
