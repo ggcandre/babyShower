@@ -63,8 +63,11 @@
     els.productModalCancel.addEventListener('click', closeProductModal);
     els.productForm.addEventListener('submit', handleProductSubmit);
 
-    if (state.apiKey) {
+    if (state.apiKey === ADMIN_SECRET) {
       showApp();
+    } else if (state.apiKey) {
+      state.apiKey = '';
+      sessionStorage.removeItem(STORAGE_KEY);
     }
   }
 
