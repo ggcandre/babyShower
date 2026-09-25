@@ -63,7 +63,9 @@
     try {
       const data = localStorage.getItem(CACHE_KEY);
       const products = data ? JSON.parse(data) : null;
-      return Array.isArray(products) ? products.filter(isVisibleProduct) : null;
+      return Array.isArray(products)
+        ? moveFirstProductToEnd(products.filter(isVisibleProduct))
+        : null;
     } catch (e) {
       return null;
     }
@@ -71,6 +73,10 @@
 
   function isVisibleProduct(product) {
     return String(product && product.category || '').trim() !== 'Amamentação';
+  }
+
+  function moveFirstProductToEnd(products) {
+    return products.length > 1 ? products.slice(1).concat(products[0]) : products;
   }
 
   function setLocalCache(products) {
@@ -124,7 +130,7 @@
         }
       });
 
-      const processed = rawProducts.map(function (p) {
+      const processed = moveFirstProductToEnd(rawProducts.map(function (p) {
         const pId = String(p.id);
         const desired = Number(p.desired_quantity) || 0;
         const reserved = totals[pId] || 0;
@@ -144,7 +150,7 @@
           purchase_url: p.purchase_url,
           active: p.active
         };
-      });
+      }));
 
       state.products = processed;
       setLocalCache(processed);
