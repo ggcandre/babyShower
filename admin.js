@@ -138,6 +138,7 @@
         });
       });
 
+      populateCategoryOptions();
       renderProductsTable();
     } catch (err) {
       console.error(err);
@@ -191,6 +192,7 @@
   function openProductModal(product) {
     els.productFormMessage.textContent = '';
     els.productModalTitle.textContent = product ? 'Editar produto' : 'Novo produto';
+    populateCategoryOptions(product ? product.category : '');
     els.pf.id.value = product ? product.id : '';
     els.pf.name.value = product ? product.name : '';
     els.pf.description.value = product ? product.description : '';
@@ -200,6 +202,27 @@
     els.pf.image.value = product ? product.image_url : '';
     els.pf.purchase.value = product ? product.purchase_url : '';
     els.productModalOverlay.classList.remove('hidden');
+  }
+
+  function populateCategoryOptions(selectedCategory) {
+    const categories = state.products
+      .map(function (product) { return String(product.category || '').trim(); })
+      .filter(function (category, index, values) {
+        return category && values.indexOf(category) === index;
+      });
+    const selected = String(selectedCategory || '').trim();
+    if (selected && categories.indexOf(selected) === -1) {
+      categories.push(selected);
+    }
+
+    els.pf.category.innerHTML = '<option value="">Sem categoria</option>';
+    categories.forEach(function (category) {
+      const option = document.createElement('option');
+      option.value = category;
+      option.textContent = category;
+      els.pf.category.appendChild(option);
+    });
+    els.pf.category.value = selected;
   }
 
   function closeProductModal() {

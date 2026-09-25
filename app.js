@@ -11,12 +11,17 @@
   const state = {
     products: [],
     activeCategory: 'Todos',
+    sortOrder: 'default',
+    priceLimit: '',
     selectedProduct: null,
     selectedRequestId: null
   };
 
   const els = {
     filters: document.getElementById('filters'),
+    sortOrder: document.getElementById('sort-order'),
+    priceLimit: document.getElementById('price-limit'),
+    priceLimitValue: document.getElementById('price-limit-value'),
     content: document.getElementById('content'),
     modalOverlay: document.getElementById('modal-overlay'),
     modalCloseX: document.getElementById('modal-close-x'),
@@ -39,6 +44,7 @@
     const cached = getLocalCache();
     if (cached && Array.isArray(cached) && cached.length > 0) {
       state.products = cached;
+      configurePriceLimit();
       renderFilters();
       renderList();
       loadProducts(true);
@@ -57,6 +63,14 @@
       if (e.target === els.modalOverlay) closeModal();
     });
     els.reserveForm.addEventListener('submit', handleReserveSubmit);
+    els.sortOrder.addEventListener('change', function () {
+      state.sortOrder = els.sortOrder.value;
+      renderList();
+    });
+    els.priceLimit.addEventListener('input', function () {
+      updatePriceLimitValue();
+      renderList();
+    });
   }
 
   function getLocalCache() {
@@ -154,6 +168,7 @@
 
       state.products = processed;
       setLocalCache(processed);
+      configurePriceLimit();
       renderFilters();
       renderList();
     } catch (err) {
@@ -225,9 +240,25 @@
   }
 
   function renderList() {
-    const items = state.products.filter(function (p) {
-      return state.activeCategory === 'Todos' || p.category === state.activeCategory;
+    let items = state.products.filter(function (p) {
+      const matchesCategory = state.activeCategory === 'Todos' || p.category === state.activeCategory;
+      const price = Number(p.price);
+      const matchesPrice = !state.priceLimit || (Number.isFinite(price) && price <= Number(state.priceLimit));
+      return matchesCategory && matchesPrice;
     });
+
+    if (state.sortOrder !== 'default') {
+      items = items.slice().sort(function (a, b) {
+        const priceA = Number(a.price);
+        const priceB = Number(b.price);
+        const hasPriceA = Number.isFinite(priceA);
+        const hasPriceB = Number.isFinite(priceB);
+
+        if (hasPriceA !== hasPriceB) return hasPriceA ? -1 : 1;
+        if (!hasPriceA) return 0;
+        return state.sortOrder === 'price-asc' ? priceA - priceB : priceB - priceA;
+      });
+    }
 
     if (items.length === 0) {
       els.content.innerHTML = '<div class="empty-state">Ainda não há itens nesta categoria.</div>';
@@ -244,6 +275,30 @@
         if (product) openModal(product);
       });
     });
+  }
+
+  function configurePriceLimit() {
+    const prices = state.products
+      .map(function (product) { return Number(product.price); })
+      .filter(Number.isFinite);
+    const minimum = prices.length > 0 ? Math.min.apply(null, prices) : 0;
+    const maximum = prices.length > 0 ? Math.max.apply(null, prices) : 0;
+    const sliderMaximum = prices.length > 0 ? maximum : 10;
+
+    els.priceLimit.min = minimum;
+    els.priceLimit.max = sliderMaximum;
+    if (!state.priceLimit || Number(state.priceLimit) < minimum || Number(state.priceLimit) > sliderMaximum) {
+      state.priceLimit = '';
+    }
+    els.priceLimit.value = state.priceLimit || sliderMaximum;
+    updatePriceLimitValue();
+  }
+
+  function updatePriceLimitValue() {
+    const value = Number(els.priceLimit.value);
+    const maximum = Number(els.priceLimit.max);
+    state.priceLimit = value >= maximum ? '' : els.priceLimit.value;
+    els.priceLimitValue.textContent = state.priceLimit ? 'Até ' + value + ' €' : 'Todos';
   }
 
   function renderItemRow(p) {

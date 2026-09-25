@@ -44,7 +44,23 @@
     O teu navegador não suporta vídeo.
   </video>
 
-  <div class="filters" id="filters"></div>
+  <div class="list-controls">
+    <div class="filters" id="filters"></div>
+    <div class="sort-controls-row">
+      <label class="sort-control" for="sort-order">
+        <span>Ordenar por</span>
+        <select id="sort-order">
+          <option value="default">Ordem atual</option>
+          <option value="price-desc">Preço mais alto</option>
+          <option value="price-asc">Preço mais baixo</option>
+        </select>
+      </label>
+      <label class="sort-control price-slider-control" for="price-limit">
+        <span>Preço máximo: <strong id="price-limit-value">Todos</strong></span>
+        <input type="range" id="price-limit" min="0" max="200" value="200" step="1">
+      </label>
+    </div>
+  </div>
 
   <div id="content">
     <div class="loading-state">A carregar a lista…</div>

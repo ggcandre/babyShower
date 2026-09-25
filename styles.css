@@ -217,6 +217,83 @@ button {
   padding: 4px 2px 10px;
 }
 
+.list-controls {
+  margin-bottom: 24px;
+}
+
+.sort-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 2px 10px;
+}
+
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink-soft);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.sort-control select {
+  border: 1px solid #203e5c;
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  padding: 7px 28px 7px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.price-slider-control {
+  min-width: 190px;
+}
+
+.price-slider-control input[type="range"] {
+  width: 150px;
+  height: 18px;
+  margin: 0;
+  accent-color: #96693e;
+  cursor: pointer;
+}
+
+.price-slider-control input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: #96693e;
+}
+
+.price-slider-control input[type="range"]::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 2px solid #96693e;
+  border-radius: 50%;
+  background: var(--color-bg);
+  -webkit-appearance: none;
+}
+
+.price-slider-control input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: #96693e;
+}
+
+.price-slider-control input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #96693e;
+  border-radius: 50%;
+  background: var(--color-bg);
+}
+
+.price-slider-control strong {
+  color: #96693e;
+  font-weight: 600;
+}
+
 .filters::-webkit-scrollbar {
   display: none;
 }
@@ -227,6 +304,17 @@ button {
     overflow-x: visible;
     padding: 0;
     margin-bottom: 32px;
+  }
+
+  .sort-control {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .sort-controls-row {
+    flex-wrap: wrap;
+    gap: 12px 20px;
   }
 }
 
@@ -254,8 +342,14 @@ button {
 }
 
 .filter-chip.active {
-  background: var(--color-ink);
-  border-color: var(--color-ink);
+  background: #96693e;
+  border-color: #96693e;
+  color: var(--color-bg);
+}
+
+.filter-chip.active:hover {
+  background: #96693e;
+  border-color: #96693e;
   color: var(--color-bg);
 }
 
