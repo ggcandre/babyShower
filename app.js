@@ -62,10 +62,15 @@
   function getLocalCache() {
     try {
       const data = localStorage.getItem(CACHE_KEY);
-      return data ? JSON.parse(data) : null;
+      const products = data ? JSON.parse(data) : null;
+      return Array.isArray(products) ? products.filter(isVisibleProduct) : null;
     } catch (e) {
       return null;
     }
+  }
+
+  function isVisibleProduct(product) {
+    return String(product && product.category || '').trim() !== 'Amamentação';
   }
 
   function setLocalCache(products) {
@@ -101,7 +106,7 @@
       if (productsRes.error) throw productsRes.error;
       if (reservationsRes.error) throw reservationsRes.error;
 
-      const rawProducts = productsRes.data || [];
+      const rawProducts = (productsRes.data || []).filter(isVisibleProduct);
       const rawReservations = reservationsRes.data || [];
 
       // Resumo de reservas por produto
