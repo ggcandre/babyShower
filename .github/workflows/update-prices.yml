@@ -1,0 +1,26 @@
+name: Atualização Diária de Preços
+
+on:
+  schedule:
+    # Executa todos os dias às 03:00 UTC (madrugada: 03:00/04:00 em Portugal)
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Permite correr manualmente no GitHub a qualquer momento
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Executar script de atualização de preços
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://abrkfvebnxkpfcywyiyy.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFicmtmdmVibnhrcGZjeXd5aXl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNzQwMzAsImV4cCI6MjEwNTc1MDAzMH0.t1rDKh_sGfpvWTmHP7brL53k_EUp6xzKjjuP5AUuAl0' }}
+        run: node scripts/update-prices.js

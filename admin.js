@@ -6,7 +6,7 @@
   const STORAGE_KEY = 'lista_nascimento_admin_key';
 
   // Chave de acesso ao painel de administração (podes alterar para a tua palavra-passe preferida)
-  const ADMIN_SECRET = 'BabyshowerSementinha2026';
+  const ADMIN_SECRET = 'Artur2026';
 
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
