@@ -14,6 +14,7 @@
     apiKey: sessionStorage.getItem(STORAGE_KEY) || '',
     products: [],
     reservations: [],
+    rsvps: [],
     activeTab: 'products'
   };
 
@@ -26,10 +27,13 @@
     tabButtons: Array.from(document.querySelectorAll('.tab-btn')),
     tabProducts: document.getElementById('tab-products'),
     tabReservations: document.getElementById('tab-reservations'),
+    tabRsvps: document.getElementById('tab-rsvps'),
     productsTableWrap: document.getElementById('products-table-wrap'),
     reservationsTableWrap: document.getElementById('reservations-table-wrap'),
+    rsvpsTableWrap: document.getElementById('rsvps-table-wrap'),
     addProductBtn: document.getElementById('add-product-btn'),
     refreshReservationsBtn: document.getElementById('refresh-reservations-btn'),
+    refreshRsvpsBtn: document.getElementById('refresh-rsvps-btn'),
     productModalOverlay: document.getElementById('product-modal-overlay'),
     productModalTitle: document.getElementById('product-modal-title'),
     productForm: document.getElementById('product-form'),
@@ -60,6 +64,7 @@
     });
     els.addProductBtn.addEventListener('click', function () { openProductModal(null); });
     els.refreshReservationsBtn.addEventListener('click', loadReservations);
+    els.refreshRsvpsBtn.addEventListener('click', loadRsvps);
     els.productModalCancel.addEventListener('click', closeProductModal);
     els.productForm.addEventListener('submit', handleProductSubmit);
 
@@ -97,8 +102,12 @@
     });
     els.tabProducts.style.display = tab === 'products' ? 'block' : 'none';
     els.tabReservations.style.display = tab === 'reservations' ? 'block' : 'none';
+    els.tabRsvps.style.display = tab === 'rsvps' ? 'block' : 'none';
     if (tab === 'reservations' && state.reservations.length === 0) {
       loadReservations();
+    }
+    if (tab === 'rsvps' && state.rsvps.length === 0) {
+      loadRsvps();
     }
   }
 
@@ -377,6 +386,57 @@
         }
       });
     });
+  }
+
+  // ------------------------------------------------------------------
+  // Confirmações de presença (RSVPs)
+  // ------------------------------------------------------------------
+
+  async function loadRsvps() {
+    els.rsvpsTableWrap.innerHTML = '<div class="loading-state">A carregar confirmações…</div>';
+    try {
+      const { data, error } = await supabase
+        .from('rsvps')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      state.rsvps = data || [];
+      renderRsvpsTable();
+    } catch (err) {
+      console.error(err);
+      showToast('Erro ao carregar confirmações.');
+    }
+  }
+
+  function renderRsvpsTable() {
+    if (state.rsvps.length === 0) {
+      els.rsvpsTableWrap.innerHTML = '<div class="empty-state">Ainda não há confirmações.</div>';
+      return;
+    }
+
+    const totalAttending = state.rsvps
+      .filter(function (r) { return r.attending; })
+      .reduce(function (sum, r) { return sum + (Number(r.guest_count) || 0); }, 0);
+
+    const rows = state.rsvps.map(function (r) {
+      return (
+        '<tr>' +
+          '<td>' + escapeHtml(r.guest_name) + '</td>' +
+          '<td><span class="status-pill ' + (r.attending ? 'confirmed' : 'cancelled') + '">' + (r.attending ? 'Vai' : 'Não vai') + '</span></td>' +
+          '<td>' + escapeHtml(String(r.guest_count)) + '</td>' +
+          '<td>' + escapeHtml(r.message || '—') + '</td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    els.rsvpsTableWrap.innerHTML =
+      '<p style="margin-bottom:12px;color:var(--color-ink-soft);">Total de pessoas confirmadas: <strong>' + totalAttending + '</strong></p>' +
+      '<table class="admin-table">' +
+        '<thead><tr><th>Convidado</th><th>Estado</th><th>Pessoas</th><th>Mensagem</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>';
   }
 
   function showToast(message) {

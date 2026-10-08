@@ -28,6 +28,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="products">Produtos</button>
       <button class="tab-btn" data-tab="reservations">Reservas</button>
+      <button class="tab-btn" data-tab="rsvps">Confirmações</button>
     </div>
 
     <div id="tab-products">
@@ -47,6 +48,16 @@
       </div>
       <div id="reservations-table-wrap">
         <div class="loading-state">A carregar reservas…</div>
+      </div>
+    </div>
+
+    <div id="tab-rsvps" style="display:none;">
+      <div class="admin-toolbar">
+        <span></span>
+        <button class="icon-btn" id="refresh-rsvps-btn">Atualizar</button>
+      </div>
+      <div id="rsvps-table-wrap">
+        <div class="loading-state">A carregar confirmações…</div>
       </div>
     </div>
   </div>
