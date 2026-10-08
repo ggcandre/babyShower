@@ -45,6 +45,7 @@
     rsvpAttendingToggle: document.getElementById('rsvp-attending-toggle'),
     rsvpName: document.getElementById('rsvp-name'),
     rsvpGuestCountField: document.getElementById('rsvp-guest-count-field'),
+    rsvpGuestCountLabel: document.getElementById('rsvp-guest-count-label'),
     rsvpGuestCount: document.getElementById('rsvp-guest-count'),
     rsvpMessage: document.getElementById('rsvp-message'),
     rsvpCancel: document.getElementById('rsvp-cancel'),
@@ -495,7 +496,13 @@
     Array.from(els.rsvpAttendingToggle.querySelectorAll('.rsvp-toggle-btn')).forEach(function (btn) {
       btn.classList.toggle('active', btn.getAttribute('data-attending') === value);
     });
-    els.rsvpGuestCountField.classList.toggle('field-hidden', value !== 'yes');
+    if (value === 'no') {
+      els.rsvpGuestCountLabel.textContent = 'Quantas pessoas não vão poder ir';
+    } else if (value === 'yes') {
+      els.rsvpGuestCountLabel.textContent = 'Quantas pessoas vão (incluindo tu)';
+    } else {
+      els.rsvpGuestCountLabel.textContent = 'Quantas pessoas';
+    }
   }
 
   function setRsvpSubmitLoading(isLoading) {
@@ -524,7 +531,7 @@
 
     const attending = state.rsvpAttending === 'yes';
     const guestName = els.rsvpName.value.trim();
-    const guestCount = attending ? Math.max(1, parseInt(els.rsvpGuestCount.value, 10) || 1) : 1;
+    const guestCount = Math.max(1, parseInt(els.rsvpGuestCount.value, 10) || 1);
     const guestMsg = els.rsvpMessage.value.trim();
 
     try {

@@ -836,10 +836,6 @@ button {
   color: #96693e;
 }
 
-#rsvp-guest-count-field.field-hidden {
-  display: none;
-}
-
 .modal-actions {
   display: flex;
   gap: 12px;
