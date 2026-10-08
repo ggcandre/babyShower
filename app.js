@@ -17,7 +17,9 @@
     selectedProduct: null,
     selectedRequestId: null,
     rsvpAttending: null,
-    rsvpEditingId: null
+    rsvpEditingId: null,
+    lastOwnReservation: null,
+    lastOwnRsvp: null
   };
 
   const els = {
@@ -230,7 +232,10 @@
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'reservations' },
-        function () {
+        function (payload) {
+          if (payload.eventType === 'INSERT') {
+            notifyReservation(payload.new);
+          }
           // Quando qualquer reserva for feita/alterada, atualiza em background
           loadProducts(true);
         }
@@ -242,7 +247,46 @@
           loadProducts(true);
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'rsvps' },
+        function (payload) {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            notifyRsvp(payload.new);
+          }
+        }
+      )
       .subscribe();
+  }
+
+  function isOwnRecentAction(marker, matches) {
+    if (!marker || marker.until < Date.now()) return false;
+    return matches(marker);
+  }
+
+  function notifyReservation(reservation) {
+    if (isOwnRecentAction(state.lastOwnReservation, function (m) {
+      return String(m.productId) === String(reservation.product_id) && m.guestName === String(reservation.guest_name || '').trim();
+    })) {
+      state.lastOwnReservation = null;
+      return;
+    }
+    const product = state.products.find(function (p) { return String(p.id) === String(reservation.product_id); });
+    const itemName = product ? product.name : 'um item';
+    const guestName = String(reservation.guest_name || '').trim();
+    showToast((guestName ? guestName + ' reservou: ' : 'Reserva feita: ') + itemName + ' 🤍');
+  }
+
+  function notifyRsvp(rsvp) {
+    const guestName = String(rsvp.guest_name || '').trim();
+    if (isOwnRecentAction(state.lastOwnRsvp, function (m) {
+      return m.guestName === guestName;
+    })) {
+      state.lastOwnRsvp = null;
+      return;
+    }
+    const name = guestName || 'Alguém';
+    showToast(rsvp.attending ? name + ' confirmou presença! 🎉' : name + ' avisou que não vai poder vir.');
   }
 
   function renderErrorState() {
@@ -485,6 +529,7 @@
 
     try {
       // Chama a função RPC atómica do Postgres no Supabase
+      state.lastOwnReservation = { productId: selectedProd.id, guestName: guestName, until: Date.now() + 5000 };
       const { data, error } = await supabase.rpc('make_reservation', {
         p_product_id: selectedProd.id,
         p_guest_name: guestName,
@@ -614,6 +659,7 @@
         guest_count: guestCount,
         message: guestMsg
       };
+      state.lastOwnRsvp = { guestName: guestName, until: Date.now() + 5000 };
       const { error } = state.rsvpEditingId
         ? await supabase.from('rsvps').update(payload).eq('id', state.rsvpEditingId)
         : await supabase.from('rsvps').insert(payload);
