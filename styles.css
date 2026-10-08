@@ -251,6 +251,18 @@ button {
   min-width: 190px;
 }
 
+.available-only-control {
+  cursor: pointer;
+}
+
+.available-only-control input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #96693e;
+  cursor: pointer;
+}
+
 .price-slider-control input[type="range"] {
   width: 150px;
   height: 18px;

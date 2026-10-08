@@ -13,6 +13,7 @@
     activeCategory: 'Todos',
     sortOrder: 'default',
     priceLimit: '',
+    onlyAvailable: false,
     selectedProduct: null,
     selectedRequestId: null
   };
@@ -22,6 +23,7 @@
     sortOrder: document.getElementById('sort-order'),
     priceLimit: document.getElementById('price-limit'),
     priceLimitValue: document.getElementById('price-limit-value'),
+    onlyAvailable: document.getElementById('available-only'),
     content: document.getElementById('content'),
     modalOverlay: document.getElementById('modal-overlay'),
     modalCloseX: document.getElementById('modal-close-x'),
@@ -69,6 +71,10 @@
     });
     els.priceLimit.addEventListener('input', function () {
       updatePriceLimitValue();
+      renderList();
+    });
+    els.onlyAvailable.addEventListener('change', function () {
+      state.onlyAvailable = els.onlyAvailable.checked;
       renderList();
     });
   }
@@ -244,7 +250,8 @@
       const matchesCategory = state.activeCategory === 'Todos' || p.category === state.activeCategory;
       const price = Number(p.price);
       const matchesPrice = !state.priceLimit || (Number.isFinite(price) && price <= Number(state.priceLimit));
-      return matchesCategory && matchesPrice;
+      const matchesAvailability = !state.onlyAvailable || Number(p.available_quantity) > 0;
+      return matchesCategory && matchesPrice && matchesAvailability;
     });
 
     if (state.sortOrder !== 'default') {
