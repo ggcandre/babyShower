@@ -116,6 +116,7 @@ function extractPriceFromHtml(html) {
 async function main() {
   const now = new Date();
   if (now > EXPIRATION_DATE) {
+    console.log('Data de expiração atingida (' + EXPIRATION_DATE.toISOString() + ') — script não faz nada.');
     return;
   }
 
@@ -130,6 +131,7 @@ async function main() {
   ]);
 
   if (!productsRes.ok || !reservationsRes.ok) {
+    console.error('Falha ao obter dados do Supabase. products=' + productsRes.status + ' reservations=' + reservationsRes.status);
     process.exit(1);
   }
 
@@ -151,23 +153,39 @@ async function main() {
     return available > 0 && p.purchase_url && p.purchase_url.startsWith('http');
   });
 
+  console.log(`${candidates.length} produto(s) candidato(s) a atualização de preço.`);
+
+  const summary = { updated: 0, unchanged: 0, noPrice: 0, fetchFailed: 0, rejected: 0 };
+
   for (const p of candidates) {
     const currentPrice = Number(p.price) || 0;
     const html = await fetchWithTimeout(p.purchase_url);
-    if (!html) continue;
+    if (!html) {
+      summary.fetchFailed++;
+      console.warn(`[falhou pedido] ${p.name} — ${p.purchase_url}`);
+      continue;
+    }
 
     const scrapedPrice = extractPriceFromHtml(html);
-    if (!scrapedPrice) continue;
+    if (!scrapedPrice) {
+      summary.noPrice++;
+      console.warn(`[sem preço extraído] ${p.name} — ${p.purchase_url}`);
+      continue;
+    }
 
     // Trava de segurança: Se a diferença for > 80% do valor anterior, pode ter lido um acessório/erro
     if (currentPrice > 0) {
       const ratio = scrapedPrice / currentPrice;
-      if (ratio < 0.2 || ratio > 2.5) continue;
+      if (ratio < 0.2 || ratio > 2.5) {
+        summary.rejected++;
+        console.warn(`[rejeitado pela trava de segurança] ${p.name}: ${currentPrice} -> ${scrapedPrice}`);
+        continue;
+      }
     }
 
     if (Math.abs(scrapedPrice - currentPrice) > 0.01) {
       // Atualizar no Supabase
-      await fetch(`${SUPABASE_URL}/rest/v1/products?id=eq.${p.id}`, {
+      const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/products?id=eq.${p.id}`, {
         method: 'PATCH',
         headers: {
           'apikey': SUPABASE_ANON_KEY,
@@ -179,11 +197,25 @@ async function main() {
           updated_at: new Date().toISOString()
         })
       });
+
+      if (patchRes.ok) {
+        summary.updated++;
+        console.log(`[atualizado] ${p.name}: ${currentPrice} -> ${scrapedPrice}`);
+      } else {
+        console.error(`[falhou atualização] ${p.name} — status ${patchRes.status}`);
+      }
+    } else {
+      summary.unchanged++;
     }
 
     // Pequena pausa entre pedidos para não sobrecarregar as lojas
     await new Promise(res => setTimeout(res, 800));
   }
+
+  console.log('Resumo:', JSON.stringify(summary));
 }
 
-main().catch(() => {});
+main().catch(err => {
+  console.error('Erro fatal no script de atualização de preços:', err);
+  process.exit(1);
+});
