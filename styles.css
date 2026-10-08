@@ -156,6 +156,34 @@ button {
   margin-top: 16px;
 }
 
+.mobile-rsvp-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-line);
+  padding: 10px 16px max(10px, env(safe-area-inset-bottom));
+  transform: translateY(100%);
+  transition: transform 0.25s ease;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.mobile-rsvp-bar.visible {
+  transform: translateY(0);
+}
+
+.mobile-rsvp-bar .btn {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .mobile-rsvp-bar {
+    display: none;
+  }
+}
+
 .rsvp-divider {
   display: block;
   width: 120px;
@@ -253,6 +281,31 @@ button {
 
 .price-slider-control {
   min-width: 190px;
+}
+
+.price-slider-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.price-slider-bubble {
+  position: absolute;
+  bottom: 22px;
+  transform: translateX(-50%);
+  background: #5c3a1e;
+  color: #FBF6EE;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.price-slider-bubble.visible {
+  opacity: 1;
 }
 
 .available-only-control {
@@ -396,7 +449,8 @@ button {
 }
 
 .item-row.is-full {
-  opacity: 0.65;
+  opacity: 0.55;
+  filter: grayscale(0.4);
 }
 
 .item-header-mobile {
@@ -623,7 +677,7 @@ button {
 .btn-primary {
   background: #adbfd2;
   border: 2px solid #96693e;
-  color: #96693e;
+  color: #5c3a1e;
 }
 
 .btn-primary:hover { background: #9cb1c7; }
@@ -833,7 +887,7 @@ button {
 .rsvp-toggle-btn.active {
   background: #adbfd2;
   border-color: #96693e;
-  color: #96693e;
+  color: #5c3a1e;
 }
 
 .modal-actions {

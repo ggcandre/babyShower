@@ -16,7 +16,8 @@
     onlyAvailable: false,
     selectedProduct: null,
     selectedRequestId: null,
-    rsvpAttending: null
+    rsvpAttending: null,
+    rsvpEditingId: null
   };
 
   const els = {
@@ -24,6 +25,7 @@
     sortOrder: document.getElementById('sort-order'),
     priceLimit: document.getElementById('price-limit'),
     priceLimitValue: document.getElementById('price-limit-value'),
+    priceSliderBubble: document.getElementById('price-slider-bubble'),
     onlyAvailable: document.getElementById('available-only'),
     content: document.getElementById('content'),
     modalOverlay: document.getElementById('modal-overlay'),
@@ -50,7 +52,9 @@
     rsvpMessage: document.getElementById('rsvp-message'),
     rsvpCancel: document.getElementById('rsvp-cancel'),
     rsvpSubmit: document.getElementById('rsvp-submit'),
-    rsvpFormMessage: document.getElementById('rsvp-form-message')
+    rsvpFormMessage: document.getElementById('rsvp-form-message'),
+    mobileRsvpBar: document.getElementById('mobile-rsvp-bar'),
+    mobileRsvpBtn: document.getElementById('mobile-rsvp-btn')
   };
 
   init();
@@ -86,7 +90,9 @@
     els.priceLimit.addEventListener('input', function () {
       updatePriceLimitValue();
       renderList();
+      showPriceBubble();
     });
+    els.priceLimit.addEventListener('change', hidePriceBubble);
     els.onlyAvailable.addEventListener('change', function () {
       state.onlyAvailable = els.onlyAvailable.checked;
       renderList();
@@ -106,6 +112,10 @@
       });
     });
     els.rsvpForm.addEventListener('submit', handleRsvpSubmit);
+    els.rsvpName.addEventListener('blur', lookupExistingRsvp);
+
+    els.mobileRsvpBtn.addEventListener('click', openRsvpModal);
+    setupMobileRsvpBarVisibility();
   }
 
   function getLocalCache() {
@@ -259,9 +269,17 @@
       return;
     }
 
+    const counts = {};
+    state.products.forEach(function (p) {
+      if (!p.category) return;
+      counts[p.category] = (counts[p.category] || 0) + 1;
+    });
+
     els.filters.innerHTML = categories.map(function (cat) {
       const active = cat === state.activeCategory ? ' active' : '';
-      return '<button class="filter-chip' + active + '" data-category="' + escapeHtml(cat) + '">' + escapeHtml(cat) + '</button>';
+      const count = cat === 'Todos' ? state.products.length : (counts[cat] || 0);
+      const label = escapeHtml(cat) + ' (' + count + ')';
+      return '<button class="filter-chip' + active + '" data-category="' + escapeHtml(cat) + '">' + label + '</button>';
     }).join('');
 
     Array.from(els.filters.querySelectorAll('.filter-chip')).forEach(function (btn) {
@@ -283,7 +301,13 @@
       return matchesCategory && matchesPrice && matchesAvailability;
     });
 
-    if (state.sortOrder !== 'default') {
+    if (state.sortOrder === 'default') {
+      items = items.slice().sort(function (a, b) {
+        const aFull = Number(a.available_quantity) > 0 ? 0 : 1;
+        const bFull = Number(b.available_quantity) > 0 ? 0 : 1;
+        return aFull - bFull;
+      });
+    } else {
       items = items.slice().sort(function (a, b) {
         const priceA = Number(a.price);
         const priceB = Number(b.price);
@@ -335,6 +359,22 @@
     const maximum = Number(els.priceLimit.max);
     state.priceLimit = value >= maximum ? '' : els.priceLimit.value;
     els.priceLimitValue.textContent = state.priceLimit ? 'Até ' + value + ' €' : 'Todos';
+    updatePriceBubble(value, maximum);
+  }
+
+  function updatePriceBubble(value, maximum) {
+    const minimum = Number(els.priceLimit.min);
+    const percent = maximum > minimum ? (value - minimum) / (maximum - minimum) : 0;
+    els.priceSliderBubble.style.left = (percent * 100) + '%';
+    els.priceSliderBubble.textContent = state.priceLimit ? value + ' €' : 'Todos';
+  }
+
+  function showPriceBubble() {
+    els.priceSliderBubble.classList.add('visible');
+  }
+
+  function hidePriceBubble() {
+    els.priceSliderBubble.classList.remove('visible');
   }
 
   function renderItemRow(p) {
@@ -479,6 +519,7 @@
     els.rsvpGuestCount.value = 1;
     els.rsvpFormMessage.textContent = '';
     els.rsvpFormMessage.className = 'form-message';
+    state.rsvpEditingId = null;
     setRsvpAttending(null);
     setRsvpSubmitLoading(false);
     els.rsvpModalOverlay.classList.remove('hidden');
@@ -512,6 +553,38 @@
     btnTextEl.textContent = isLoading ? 'A enviar…' : 'Confirmar';
   }
 
+  async function lookupExistingRsvp() {
+    const guestName = els.rsvpName.value.trim();
+    if (!guestName) {
+      state.rsvpEditingId = null;
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('rsvps')
+        .select('*')
+        .ilike('guest_name', guestName)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        state.rsvpEditingId = data.id;
+        setRsvpAttending(data.attending ? 'yes' : 'no');
+        els.rsvpGuestCount.value = data.guest_count || 1;
+        els.rsvpMessage.value = data.message || '';
+        els.rsvpFormMessage.textContent = 'Já tínhamos uma confirmação tua — vamos atualizá-la.';
+        els.rsvpFormMessage.className = 'form-message success';
+      } else {
+        state.rsvpEditingId = null;
+      }
+    } catch (err) {
+      console.error('Erro ao procurar confirmação existente:', err);
+    }
+  }
+
   async function handleRsvpSubmit(e) {
     e.preventDefault();
 
@@ -535,12 +608,15 @@
     const guestMsg = els.rsvpMessage.value.trim();
 
     try {
-      const { error } = await supabase.from('rsvps').insert({
+      const payload = {
         guest_name: guestName,
         attending: attending,
         guest_count: guestCount,
         message: guestMsg
-      });
+      };
+      const { error } = state.rsvpEditingId
+        ? await supabase.from('rsvps').update(payload).eq('id', state.rsvpEditingId)
+        : await supabase.from('rsvps').insert(payload);
 
       if (error) {
         throw error;
@@ -560,6 +636,19 @@
     const num = Number(price);
     if (isNaN(num)) return '';
     return num.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+  }
+
+  function setupMobileRsvpBarVisibility() {
+    if (!window.IntersectionObserver) {
+      els.mobileRsvpBar.classList.add('visible');
+      return;
+    }
+    const observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        els.mobileRsvpBar.classList.toggle('visible', !entry.isIntersecting);
+      });
+    });
+    observer.observe(els.openRsvpBtn);
   }
 
   function createRequestId() {
