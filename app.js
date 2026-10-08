@@ -15,7 +15,8 @@
     priceLimit: '',
     onlyAvailable: false,
     selectedProduct: null,
-    selectedRequestId: null
+    selectedRequestId: null,
+    rsvpAttending: null
   };
 
   const els = {
@@ -36,7 +37,19 @@
     modalCancel: document.getElementById('modal-cancel'),
     modalSubmit: document.getElementById('modal-submit'),
     formMessage: document.getElementById('form-message'),
-    toast: document.getElementById('toast')
+    toast: document.getElementById('toast'),
+    openRsvpBtn: document.getElementById('open-rsvp-btn'),
+    rsvpModalOverlay: document.getElementById('rsvp-modal-overlay'),
+    rsvpCloseX: document.getElementById('rsvp-close-x'),
+    rsvpForm: document.getElementById('rsvp-form'),
+    rsvpAttendingToggle: document.getElementById('rsvp-attending-toggle'),
+    rsvpName: document.getElementById('rsvp-name'),
+    rsvpGuestCountField: document.getElementById('rsvp-guest-count-field'),
+    rsvpGuestCount: document.getElementById('rsvp-guest-count'),
+    rsvpMessage: document.getElementById('rsvp-message'),
+    rsvpCancel: document.getElementById('rsvp-cancel'),
+    rsvpSubmit: document.getElementById('rsvp-submit'),
+    rsvpFormMessage: document.getElementById('rsvp-form-message')
   };
 
   init();
@@ -77,6 +90,21 @@
       state.onlyAvailable = els.onlyAvailable.checked;
       renderList();
     });
+
+    els.openRsvpBtn.addEventListener('click', openRsvpModal);
+    els.rsvpCancel.addEventListener('click', closeRsvpModal);
+    if (els.rsvpCloseX) {
+      els.rsvpCloseX.addEventListener('click', closeRsvpModal);
+    }
+    els.rsvpModalOverlay.addEventListener('click', function (e) {
+      if (e.target === els.rsvpModalOverlay) closeRsvpModal();
+    });
+    Array.from(els.rsvpAttendingToggle.querySelectorAll('.rsvp-toggle-btn')).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        setRsvpAttending(btn.getAttribute('data-attending'));
+      });
+    });
+    els.rsvpForm.addEventListener('submit', handleRsvpSubmit);
   }
 
   function getLocalCache() {
@@ -443,6 +471,82 @@
     els.toast.textContent = message;
     els.toast.classList.remove('hidden');
     setTimeout(function () { els.toast.classList.add('hidden'); }, 3500);
+  }
+
+  function openRsvpModal() {
+    els.rsvpForm.reset();
+    els.rsvpGuestCount.value = 1;
+    els.rsvpFormMessage.textContent = '';
+    els.rsvpFormMessage.className = 'form-message';
+    setRsvpAttending(null);
+    setRsvpSubmitLoading(false);
+    els.rsvpModalOverlay.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeRsvpModal() {
+    els.rsvpModalOverlay.classList.add('hidden');
+    document.body.style.overflow = '';
+    setRsvpSubmitLoading(false);
+  }
+
+  function setRsvpAttending(value) {
+    state.rsvpAttending = value;
+    Array.from(els.rsvpAttendingToggle.querySelectorAll('.rsvp-toggle-btn')).forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-attending') === value);
+    });
+    els.rsvpGuestCountField.classList.toggle('field-hidden', value !== 'yes');
+  }
+
+  function setRsvpSubmitLoading(isLoading) {
+    if (!els.rsvpSubmit) return;
+    els.rsvpSubmit.disabled = !!isLoading;
+    const btnTextEl = els.rsvpSubmit.querySelector('.btn-text') || els.rsvpSubmit;
+    btnTextEl.textContent = isLoading ? 'A enviar…' : 'Confirmar';
+  }
+
+  async function handleRsvpSubmit(e) {
+    e.preventDefault();
+
+    if (!state.rsvpAttending) {
+      els.rsvpFormMessage.textContent = 'Por favor, indica se vais estar presente.';
+      els.rsvpFormMessage.className = 'form-message error';
+      return;
+    }
+
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+
+    setRsvpSubmitLoading(true);
+    els.rsvpFormMessage.textContent = '';
+    els.rsvpFormMessage.className = 'form-message';
+
+    const attending = state.rsvpAttending === 'yes';
+    const guestName = els.rsvpName.value.trim();
+    const guestCount = attending ? Math.max(1, parseInt(els.rsvpGuestCount.value, 10) || 1) : 1;
+    const guestMsg = els.rsvpMessage.value.trim();
+
+    try {
+      const { error } = await supabase.from('rsvps').insert({
+        guest_name: guestName,
+        attending: attending,
+        guest_count: guestCount,
+        message: guestMsg
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      closeRsvpModal();
+      showToast(attending ? 'Presença confirmada. Obrigado! 🤍' : 'Obrigado por nos avisares!');
+    } catch (err) {
+      console.error('Erro ao confirmar presença:', err);
+      els.rsvpFormMessage.textContent = err.message || 'Não foi possível enviar a confirmação. Por favor tenta de novo.';
+      els.rsvpFormMessage.className = 'form-message error';
+      setRsvpSubmitLoading(false);
+    }
   }
 
   function formatPrice(price) {

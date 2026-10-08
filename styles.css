@@ -152,6 +152,10 @@ button {
   margin-bottom: 0;
 }
 
+.rsvp-open-btn {
+  margin-top: 16px;
+}
+
 .rsvp-divider {
   display: block;
   width: 120px;
@@ -609,14 +613,6 @@ button {
   flex: 1;
 }
 
-.item-actions .btn-primary {
-  background: #96693e;
-}
-
-.item-actions .btn-primary:hover {
-  background: #7d5431;
-}
-
 @media (min-width: 640px) {
   .item-actions .btn {
     flex: initial;
@@ -625,19 +621,20 @@ button {
 }
 
 .btn-primary {
-  background: var(--color-ink);
-  color: var(--color-bg);
+  background: #adbfd2;
+  border: 2px solid #96693e;
+  color: #96693e;
 }
 
-.btn-primary:hover { background: var(--color-sage-dark); }
+.btn-primary:hover { background: #9cb1c7; }
 
 .btn-secondary {
   background: transparent;
-  color: var(--color-ink);
-  border: 1px solid var(--color-line);
+  border: 2px solid #96693e;
+  color: #96693e;
 }
 
-.btn-secondary:hover { border-color: var(--color-sage); }
+.btn-secondary:hover { background: rgba(150, 105, 62, 0.1); }
 
 .btn:disabled {
   opacity: 0.55;
@@ -808,6 +805,39 @@ button {
 .field textarea {
   resize: vertical;
   min-height: 80px;
+}
+
+.rsvp-toggle {
+  display: flex;
+  gap: 10px;
+}
+
+.rsvp-toggle-btn {
+  flex: 1;
+  border: 2px solid #96693e;
+  background: transparent;
+  color: #96693e;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.rsvp-toggle-btn:hover {
+  background: rgba(150, 105, 62, 0.1);
+}
+
+.rsvp-toggle-btn.active {
+  background: #adbfd2;
+  border-color: #96693e;
+  color: #96693e;
+}
+
+#rsvp-guest-count-field.field-hidden {
+  display: none;
 }
 
 .modal-actions {
