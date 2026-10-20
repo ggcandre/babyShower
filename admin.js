@@ -432,7 +432,7 @@
     }).join('');
 
     els.rsvpsTableWrap.innerHTML =
-      '<p style="margin-bottom:12px;color:var(--color-ink-soft);">Total de pessoas confirmadas: <strong>' + totalAttending + '</strong></p>' +
+      '<p style="margin-bottom:12px;color:var(--color-ink-soft);">Número de presenças: <strong>' + totalAttending + '</strong></p>' +
       '<table class="admin-table">' +
         '<thead><tr><th>Convidado</th><th>Estado</th><th>Pessoas</th><th>Mensagem</th></tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
